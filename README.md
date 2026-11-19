@@ -1,6 +1,6 @@
 # Telegram Auto-Sales Bot
 
-**v2.4.0** · [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/new?repo=https://github.com/maingocanh1702/telegram-sales-bot)
+**v2.4.0**
 
 > 🚀 **Tìm kiếm phiên bản SaaS Multi-Tenant & Quản lý CTV?**
 > Hãy tham khảo **[BotShopez](https://botshopez.com)** — Nền tảng SaaS Telegram Bot hoàn chỉnh với kiến trúc Monorepo (Next.js 15, NestJS 11, PostgreSQL, Redis BullMQ, Grammy). Hỗ trợ nhiều shop tập trung, phân quyền RBAC (Owner / Admin / CTV), chia sẻ kho hàng (shared stock), tự động đối soát hoa hồng & công nợ CTV!
@@ -16,34 +16,6 @@ Bot bán hàng Telegram tự động (phiên bản Standalone / Single-Shop): kh
 - **qrcode** — Render mã QR thành ảnh PNG gửi trực tiếp trong chat
 - **VietQR** Quicklink (Tạo mã QR động chuyển khoản chính xác nội dung & số tiền)
 - **Express.js** (Server tiếp nhận Webhook & Admin Dashboard)
-
----
-
-## 🚀 Triển khai nhanh (Deploy on Railway)
-
-> Hỗ trợ triển khai 1-click lên Railway không cần cấu hình server thủ công.
-
-### Chuẩn bị trước
-
-| Hạng mục | Chi tiết |
-|----------|----------|
-| 🤖 **Bot Telegram** | Chat [@BotFather](https://t.me/BotFather) → `/newbot` → lấy `BOT_TOKEN` |
-| 🏦 **Tài khoản ngân hàng** | Ngân hàng hỗ trợ SePay (TPBank, Techcombank, MB, Vietcombank...) |
-| 💳 **SePay** | Đăng ký tại [my.sepay.vn](https://my.sepay.vn), kết nối tài khoản ngân hàng & lấy API Key |
-| 🚂 **Railway** | Tài khoản [railway.app](https://railway.app) |
-
-### Các bước triển khai
-
-1. **Bấm nút "Deploy on Railway"** ở đầu trang.
-2. **Điền các biến môi trường** (xem bảng Environment Variables bên dưới).
-3. **Thêm Persistent Volume**: Vào service Settings → **Volumes** → Mount path: `/data`.
-4. **Tạo Domain công khai**: Vào Settings → **Networking** → **Generate Domain**.
-5. **Cấu hình SePay Webhook**:
-   - Truy cập [my.sepay.vn](https://my.sepay.vn) → **WebHooks** → **Thêm Webhook**.
-   - URL: `https://<your-domain>.up.railway.app/webhook/sepay`
-   - Sự kiện: **Có tiền vào**
-   - Loại: **WebHook xác thực thanh toán**
-6. **Kiểm tra hoạt động**: Gõ `/start` trên Telegram bot của bạn.
 
 ---
 
@@ -261,7 +233,7 @@ journalctl -u telegram-bot -f
 
 Dự án này là phiên bản **Standalone** (đơn shop, tự vận hành). Nền tảng còn có phiên bản **SaaS Platform** với quy mô doanh nghiệp:
 
-- **Standalone (`telegram-sales-bot` - Repo này)**: Thích hợp cho cá nhân, shop đơn lẻ muốn tự host nhanh gọn bằng SQLite và Node.js, chi phí tối thiểu, 1-click deploy Railway.
+- **Standalone (`telegram-sales-bot` - Repo này)**: Thích hợp cho cá nhân, shop đơn lẻ muốn tự host nhanh gọn bằng SQLite và Node.js, chi phí tối thiểu.
 - **SaaS Platform ([BotShopez](https://botshopez.com))**: Nền tảng thương mại quy mô lớn, multi-tenant cho nhiều shop, quản lý CTV (cộng tác viên) bán lại, chia sẻ kho hàng (shared stock), đối soát công nợ tự động, dashboard quản trị web hiện đại với Next.js 15 & NestJS 11.
 
 ### Bảng so sánh chi tiết
