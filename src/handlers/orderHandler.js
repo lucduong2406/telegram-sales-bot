@@ -1,7 +1,7 @@
 const db = require('../database');
 const config = require('../config');
 const { generateQRUrl } = require('../utils/vietqr');
-const { buildGpmPayQrUrl } = require('../utils/gpmpay');
+const { buildGpmPayQrUrl, buildGpmPayQrPng } = require('../utils/gpmpay');
 const { formatPrice } = require('./menuHandler');
 const { CALLBACKS } = require('./callbacks');
 const { t, getLang } = require('../locales');
@@ -77,12 +77,18 @@ function showPaymentMethodSelection(bot, orderData) {
     const lang = getLang(userId, db.getUserLanguage);
     const methods = db.getEnabledPaymentMethods();
 
-    const totalAmount = orderData.totalAmount || orderData.quantity * (orderData.unitPrice || 0);
+    let totalAmount = orderData.totalAmount;
+    if (!totalAmount) {
+        const product = db.getProductById(orderData.productId);
+        totalAmount = (product ? product.price * orderData.quantity : 0) - (orderData.discountAmount || 0);
+    } else {
+        totalAmount -= (orderData.discountAmount || 0);
+    }
     const preferredMethod = db.getPreferredPaymentMethod(userId);
 
     let text = t('payment_select', lang, { total: formatPrice(totalAmount) });
     if (preferredMethod) {
-        const methodLabels = { vietqr: 'VietQR (VND)', usdt: 'USDT', paypal: 'PayPal (USD)', gpmpay: 'GPM Pay (VND)' };
+        const methodLabels = { vietqr: 'VND', usdt: 'USDT', paypal: 'PayPal (USD)', gpmpay: 'VND' };
         text += `\n\n⭐ ${lang === 'en' ? 'Default' : 'Mặc định'}: ${methodLabels[preferredMethod] || preferredMethod}`;
     }
 
@@ -91,10 +97,12 @@ function showPaymentMethodSelection(bot, orderData) {
     const eurRate = db.getExchangeRate('EUR') || 27800;
 
     const keyboard = [];
+    const hasGpmPay = methods.some(m => m.id === 'gpmpay');
     for (const method of methods) {
+        if (method.id === 'vietqr' && hasGpmPay) continue; // single VND button
         let callbackData;
         let label;
-        const isDefault = (method.id === preferredMethod);
+        const isDefault = (method.id === preferredMethod) || (method.id === 'gpmpay' && preferredMethod === 'vietqr');
         const star = isDefault ? '⭐ ' : '';
         if (method.id === 'vietqr') {
             callbackData = CALLBACKS.PAY_VIETQR;
@@ -111,7 +119,7 @@ function showPaymentMethodSelection(bot, orderData) {
         } else if (method.id === 'gpmpay') {
             callbackData = CALLBACKS.PAY_GPMPAY;
             const vndFormatted = Math.round(totalAmount).toLocaleString('vi-VN');
-            label = `${star}🏦 GPM Pay — ${vndFormatted} đ`;
+            label = `${star}🏦 VND — ${vndFormatted} đ`;
         }
         keyboard.push([{ text: label, callback_data: callbackData }]);
     }
@@ -145,7 +153,7 @@ function showPaymentMethodSelection(bot, orderData) {
             db.setPreferredPaymentMethod(userId, selectedMethod);
 
             if (isFirstTime) {
-                const methodLabels = { vietqr: 'VietQR (VND)', usdt: 'USDT', paypal: 'PayPal (USD)', gpmpay: 'GPM Pay (VND)' };
+                const methodLabels = { vietqr: 'VND', usdt: 'USDT', paypal: 'PayPal (USD)', gpmpay: 'VND' };
                 const notifyMsg = lang === 'en'
                     ? `⭐ *${methodLabels[selectedMethod]}* is now your default payment method.\nChange anytime via /paymentmethod`
                     : `⭐ *${methodLabels[selectedMethod]}* đã được lưu làm phương thức thanh toán mặc định.\nThay đổi bất kỳ lúc nào qua /paymentmethod`;
@@ -644,11 +652,12 @@ async function createOrderGpmPay(bot, data) {
         ];
 
         try {
-            await bot.sendPhoto(chatId, qrUrl, {
+            const qrPng = await buildGpmPayQrPng(totalAmount, orderCode);
+            await bot.sendPhoto(chatId, qrPng, {
                 caption: text,
                 parse_mode: 'Markdown',
                 reply_markup: { inline_keyboard: keyboard },
-            });
+            }, { filename: 'qr.png', contentType: 'image/png' });
         } catch (err) {
             console.error('Error sending GPM Pay QR image:', err.message);
             bot.sendMessage(chatId, text + `\n\n🔗 QR Code: ${qrUrl}`, {
@@ -732,11 +741,12 @@ async function createGpmPayMultiItemOrder(bot, data) {
         ];
 
         try {
-            await bot.sendPhoto(chatId, qrUrl, {
+            const qrPng = await buildGpmPayQrPng(totalAmount, orderCode);
+            await bot.sendPhoto(chatId, qrPng, {
                 caption: text,
                 parse_mode: 'Markdown',
                 reply_markup: { inline_keyboard: keyboard },
-            });
+            }, { filename: 'qr.png', contentType: 'image/png' });
         } catch (err) {
             console.error('Error sending GPM Pay QR image:', err.message);
             bot.sendMessage(chatId, text + `\n\n🔗 QR Code: ${qrUrl}`, {

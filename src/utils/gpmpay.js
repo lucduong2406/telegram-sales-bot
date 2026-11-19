@@ -1,4 +1,5 @@
-const { GpmPay, buildVietQrImageUrl } = require('@gpmpay/sdk');
+const { GpmPay, buildVietQrImageUrl, buildVietQrPayload } = require('@gpmpay/sdk');
+const QRCode = require('qrcode');
 const config = require('../config');
 const db = require('../database');
 
@@ -50,4 +51,19 @@ function buildGpmPayQrUrl(amount, orderCode) {
     });
 }
 
-module.exports = { getGpmPayClient, getActiveBankAccount, buildGpmPayQrUrl };
+/**
+ * Render the VietQR payload as a PNG buffer.
+ * img.vietqr.io now serves SVG only, which Telegram's sendPhoto rejects.
+ */
+function buildGpmPayQrPng(amount, orderCode) {
+    const bank = getActiveBankAccount();
+    const payload = buildVietQrPayload({
+        bankBin: bank.bankBin,
+        accountNumber: bank.accountNumber,
+        amount: Math.round(amount),
+        description: orderCode,
+    });
+    return QRCode.toBuffer(payload, { type: 'png', width: 512, margin: 2 });
+}
+
+module.exports = { getGpmPayClient, getActiveBankAccount, buildGpmPayQrUrl, buildGpmPayQrPng };
