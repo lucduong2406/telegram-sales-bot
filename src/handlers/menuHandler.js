@@ -309,8 +309,12 @@ function showLanguageSelection(bot, chatId, messageId, userId) {
 function sendMainMenu(bot, chatId, editMessageId = null, userId = null) {
     const lang = userId ? getLang(userId, db.getUserLanguage) : 'vi';
 
-    let text = '🏪 **CLOUDX SHOP**\n\n';
-    text += t('welcome', lang, { shopName: 'CloudX Shop' }) + '\n';
+    // Admin-customizable greeting (Settings → Lời chào). Escaped so stray * _ ` [ can't break Markdown.
+    const esc = (s) => String(s).replace(/([_*`\[])/g, '\\$1');
+    const customTitle = (db.getSetting('welcome_title') || '').trim();
+    const customMsg = (db.getSetting('welcome_message') || '').trim();
+    let text = `🏪 **${customTitle ? esc(customTitle) : 'CLOUDX SHOP'}**\n\n`;
+    text += (customMsg ? esc(customMsg) : t('welcome', lang, { shopName: 'CloudX Shop' })) + '\n';
 
     // New user discount hint
     if (!editMessageId && userId && db.isNewUser(userId)) {

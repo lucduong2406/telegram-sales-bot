@@ -1064,6 +1064,8 @@ function setupAdminAPI(app, bot) {
                 bank_account_name: settings.bank_account_name || config.bank.accountName || '',
                 discount_prompt_enabled: settings.discount_prompt_enabled || '1',
                 support_username: settings.support_username || config.supportUsername || '',
+                welcome_title: settings.welcome_title || '',
+                welcome_message: settings.welcome_message || '',
                 checker_enabled: settings.checker_enabled || '1',
                 checker_daily_quota: settings.checker_daily_quota || '20',
                 checker_max_batch: settings.checker_max_batch || '10',
@@ -1075,7 +1077,7 @@ function setupAdminAPI(app, bot) {
 
     app.put('/api/admin/settings', (req, res) => {
         try {
-            const allowed = ['bank_id', 'bank_code', 'bank_name', 'bank_account_no', 'bank_account_name', 'support_username', 'discount_prompt_enabled', 'checker_enabled', 'checker_daily_quota', 'checker_max_batch'];
+            const allowed = ['bank_id', 'bank_code', 'bank_name', 'bank_account_no', 'bank_account_name', 'support_username', 'welcome_title', 'welcome_message', 'discount_prompt_enabled', 'checker_enabled', 'checker_daily_quota', 'checker_max_batch'];
             const body = req.body;
             let count = 0;
             for (const key of allowed) {
