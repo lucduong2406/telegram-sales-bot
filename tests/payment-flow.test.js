@@ -80,3 +80,13 @@ describe('backup', () => {
         expect(fs.readFileSync(file).subarray(0, 15).toString()).toBe('SQLite format 3');
     });
 });
+
+describe('discount prompt preference', () => {
+    it('D1: enabled by default, can be turned off and on', () => {
+        expect(db.isDiscountPromptEnabled(4242)).toBe(true);
+        db.setDiscountPromptEnabled(4242, false);
+        expect(db.isDiscountPromptEnabled(4242)).toBe(false);
+        db.setDiscountPromptEnabled(4242, true);
+        expect(db.isDiscountPromptEnabled(4242)).toBe(true);
+    });
+});

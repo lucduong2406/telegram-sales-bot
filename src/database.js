@@ -301,6 +301,8 @@ async function initDatabase() {
         `ALTER TABLE orders ADD COLUMN exchange_rate_used REAL`,
         // Preferred payment method
         `ALTER TABLE user_preferences ADD COLUMN preferred_payment_method TEXT`,
+        // Ask for discount code at checkout (1 = ask, 0 = skip automatically)
+        `ALTER TABLE user_preferences ADD COLUMN discount_prompt_enabled INTEGER DEFAULT 1`,
     ];
     for (const sql of migrations) {
         try { db.run(sql); } catch (e) { /* column already exists */ }
@@ -1418,6 +1420,8 @@ module.exports = {
     initDatabase,
     saveDatabase,
     DB_PATH,
+    isDiscountPromptEnabled,
+    setDiscountPromptEnabled,
     getDb,
     // Categories
     getCategories,
@@ -1976,6 +1980,31 @@ function getPreferredPaymentMethod(userId) {
         }
     } catch (e) { /* ignore */ }
     return null;
+}
+
+function isDiscountPromptEnabled(userId) {
+    try {
+        const result = db.exec(
+            'SELECT discount_prompt_enabled FROM user_preferences WHERE telegram_user_id = ?',
+            [userId]
+        );
+        if (result.length > 0 && result[0].values.length > 0) {
+            const v = result[0].values[0][0];
+            return v === null || Number(v) !== 0;
+        }
+    } catch (e) { /* fall through */ }
+    return true;
+}
+
+function setDiscountPromptEnabled(userId, enabled) {
+    const v = enabled ? 1 : 0;
+    db.run(
+        `INSERT INTO user_preferences (telegram_user_id, discount_prompt_enabled, updated_at)
+         VALUES (?, ?, datetime('now'))
+         ON CONFLICT(telegram_user_id) DO UPDATE SET discount_prompt_enabled = ?, updated_at = datetime('now')`,
+        [userId, v, v]
+    );
+    saveDatabase();
 }
 
 function setPreferredPaymentMethod(userId, method) {

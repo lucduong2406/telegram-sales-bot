@@ -30,6 +30,7 @@ const CALLBACKS = {
     // Discount
     DISCOUNT_SKIP: 'discount_skip',
     DISCOUNT_ENTER: 'discount_enter',
+    DISCOUNT_TOGGLE: 'discount_toggle',
 
     // Language
     LANG_VI: 'lang_vi',

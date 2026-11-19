@@ -862,6 +862,19 @@ Số Lượng Đang Hiện Có 10"
 
         <div class="card" style="margin-top:20px">
           <div class="card-header">
+            <h3>🎟 Hỏi mã giảm giá khi thanh toán</h3>
+          </div>
+          <div class="form-group">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+              <input type="checkbox" id="discountPromptEnabled" onchange="saveDiscountPrompt()">
+              Hỏi khách "Nhập mã giảm giá / Bỏ qua" trước khi chọn thanh toán
+            </label>
+            <p class="hint">Tắt: khách đi thẳng tới bước thanh toán, không cần bấm "Bỏ qua" (áp dụng cho mọi khách).</p>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:20px">
+          <div class="card-header">
             <h3>💬 Liên hệ hỗ trợ</h3>
             <button class="btn btn-sm btn-primary" onclick="saveSupportContact()">💾 Lưu</button>
           </div>
@@ -2743,7 +2756,16 @@ Số Lượng Đang Hiện Có 10"
       try {
         const s = await apiFetch('/settings');
         document.getElementById('supportUsername').value = s.support_username || '';
+        document.getElementById('discountPromptEnabled').checked = s.discount_prompt_enabled !== '0';
       } catch (err) { /* ignore */ }
+    }
+
+    async function saveDiscountPrompt() {
+      const box = document.getElementById('discountPromptEnabled');
+      try {
+        await apiFetch('/settings', { method: 'PUT', body: { discount_prompt_enabled: box.checked ? '1' : '0' } });
+        toast(box.checked ? '✅ Đã bật hỏi mã giảm giá' : '✅ Đã tắt hỏi mã giảm giá');
+      } catch (e) { box.checked = !box.checked; toast(e.message, 'error'); }
     }
 
     async function saveSupportContact() {

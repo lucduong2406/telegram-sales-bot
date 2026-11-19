@@ -44,6 +44,24 @@ function setupDiscountHandler(bot) {
             return;
         }
 
+        // Toggle "ask for discount code at checkout"
+        if (cbData === CALLBACKS.DISCOUNT_TOGGLE) {
+            const userId = query.from.id;
+            const lang = getLang(userId, db.getUserLanguage);
+            const enabled = !db.isDiscountPromptEnabled(userId);
+            db.setDiscountPromptEnabled(userId, enabled);
+            bot.answerCallbackQuery(query.id, {
+                text: enabled
+                    ? (lang === 'en' ? 'Checkout will ask for a discount code' : 'Đã bật: hỏi mã giảm giá khi thanh toán')
+                    : (lang === 'en' ? 'Discount question skipped at checkout' : 'Đã tắt: bỏ qua bước hỏi mã giảm giá'),
+            });
+            bot.editMessageReplyMarkup(
+                { inline_keyboard: [[discountToggleButton(userId, lang)]] },
+                { chat_id: query.message.chat.id, message_id: query.message.message_id }
+            ).catch(() => {});
+            return;
+        }
+
         // Enter discount code
         if (cbData === CALLBACKS.DISCOUNT_ENTER) {
             bot.answerCallbackQuery(query.id);
@@ -206,11 +224,27 @@ function setupDiscountHandler(bot) {
     });
 }
 
+function discountToggleButton(userId, lang) {
+    const on = db.isDiscountPromptEnabled(userId);
+    const text = on
+        ? (lang === 'en' ? '🔔 Ask for code at checkout: ON' : '🔔 Hỏi mã khi thanh toán: BẬT')
+        : (lang === 'en' ? '🔕 Ask for code at checkout: OFF' : '🔕 Hỏi mã khi thanh toán: TẮT');
+    return { text, callback_data: CALLBACKS.DISCOUNT_TOGGLE };
+}
+
 /**
  * Show discount prompt to user
  */
 function promptDiscount(bot, data) {
     const { chatId, userId } = data;
+
+    // Admin turned the question off for everyone (admin.html → Cài đặt), or the user
+    // turned it off in 🎟 Mã giảm giá → go straight to payment
+    if (db.getSetting('discount_prompt_enabled') === '0' || !db.isDiscountPromptEnabled(userId)) {
+        bot.emit('order_confirmed', data);
+        return;
+    }
+
     const product = db.getProductById(data.productId);
     const orderAmount = product ? product.price * data.quantity : 0;
 
@@ -341,6 +375,8 @@ async function showAvailableDiscounts(bot, chatId, userId) {
                     { text: lang === 'en' ? '⏭ Skip → Payment' : '⏭ Bỏ qua → Thanh toán', callback_data: CALLBACKS.DISCOUNT_SKIP }
                 ]]
             };
+        } else {
+            opts.reply_markup = { inline_keyboard: [[discountToggleButton(userId, lang)]] };
         }
         bot.sendMessage(chatId, text, opts);
         return;
@@ -412,7 +448,10 @@ async function showAvailableDiscounts(bot, chatId, userId) {
     } else {
         text += '💡 _Nhập mã khi thanh toán để được giảm giá!_\n';
         text += '🛒 Dùng mã ngay: /products';
-        bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+        bot.sendMessage(chatId, text, {
+            parse_mode: 'Markdown',
+            reply_markup: { inline_keyboard: [[discountToggleButton(userId, lang)]] },
+        });
     }
 }
 
