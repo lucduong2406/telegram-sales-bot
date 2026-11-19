@@ -30,13 +30,16 @@ describe('waitUntilReachable', () => {
     });
 });
 
-function mockClient({ items = [], secret = 'sec123' } = {}) {
+function mockClient({ items = [] } = {}) {
     return {
         webhookSettings: {
             list: vi.fn().mockResolvedValue({ data: items }),
             update: vi.fn().mockResolvedValue({}),
             remove: vi.fn().mockResolvedValue({}),
-            createHmacEndpoint: vi.fn().mockResolvedValue({ setting: {}, secret }),
+            // Records whether the secret was already stored when GPM Pay "pings" during create
+            createHmacEndpoint: vi.fn().mockImplementation(async (p) => ({
+                setting: { storedAtPing: getWebhookSecret() === p.secret }, secret: p.secret,
+            })),
         },
     };
 }
@@ -45,12 +48,31 @@ describe('registerWebhook', () => {
     beforeAll(async () => { await db.initDatabase(); });
     beforeEach(() => { db.setSetting('gpmpay_webhook_secret', ''); config.gpmpayWebhookSecret = undefined; });
 
-    it('creates endpoint and stores the one-time secret', async () => {
+    it('stores the secret BEFORE creating so the ping can be verified', async () => {
         const c = mockClient();
         const r = await registerWebhook('https://a.trycloudflare.com/', c);
         expect(r).toEqual({ url: 'https://a.trycloudflare.com/webhook/gpmpay', action: 'created' });
-        expect(c.webhookSettings.createHmacEndpoint).toHaveBeenCalledWith({ url: r.url, name: 'telegram-sales-bot' });
-        expect(getWebhookSecret()).toBe('sec123');
+        const arg = c.webhookSettings.createHmacEndpoint.mock.calls[0][0];
+        expect(arg).toMatchObject({ url: r.url, name: 'telegram-sales-bot' });
+        expect(arg.secret).toMatch(/^[0-9a-f]{64}$/);
+        const res = await c.webhookSettings.createHmacEndpoint.mock.results[0].value;
+        expect(res.setting.storedAtPing).toBe(true);
+        expect(getWebhookSecret()).toBe(arg.secret);
+    });
+
+    it('rolls back the stored secret when creation fails', async () => {
+        const c = mockClient();
+        c.webhookSettings.createHmacEndpoint.mockRejectedValue(new Error('boom'));
+        await expect(registerWebhook('https://a.trycloudflare.com', c)).rejects.toThrow('boom');
+        expect(getWebhookSecret()).toBeFalsy();
+    });
+
+    it('uses the env secret for creation when set', async () => {
+        config.gpmpayWebhookSecret = 'fromenv';
+        const c = mockClient();
+        await registerWebhook('https://a.trycloudflare.com', c);
+        expect(c.webhookSettings.createHmacEndpoint.mock.calls[0][0].secret).toBe('fromenv');
+        expect(db.getSetting('gpmpay_webhook_secret')).toBeFalsy();
     });
 
     it('updates url when endpoint exists and secret is known', async () => {
@@ -63,11 +85,11 @@ describe('registerWebhook', () => {
     });
 
     it('recreates endpoint when the secret was lost', async () => {
-        const c = mockClient({ items: [{ id: 'w1', name: 'telegram-sales-bot', url: 'x' }], secret: 'fresh' });
+        const c = mockClient({ items: [{ id: 'w1', name: 'telegram-sales-bot', url: 'x' }] });
         const r = await registerWebhook('https://n.trycloudflare.com', c);
         expect(r.action).toBe('created');
         expect(c.webhookSettings.remove).toHaveBeenCalledWith('w1');
-        expect(getWebhookSecret()).toBe('fresh');
+        expect(getWebhookSecret()).toBe(c.webhookSettings.createHmacEndpoint.mock.calls[0][0].secret);
     });
 
     it('env secret takes priority over stored', () => {

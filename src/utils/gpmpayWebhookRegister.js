@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const config = require('../config');
 const db = require('../database');
 const { getGpmPayClient } = require('./gpmpay');
@@ -39,9 +40,18 @@ async function registerWebhook(publicUrl, client = null) {
         }
 
         // Missing endpoint, or we lost its secret (shown once) → recreate.
+        // GPM Pay pings the URL (signed with the new secret) while creating, so the
+        // secret must already be stored when that ping hits our handler.
         if (existing) await client.webhookSettings.remove(existing.id);
-        const { secret } = await client.webhookSettings.createHmacEndpoint({ url, name: ENDPOINT_NAME });
-        db.setSetting('gpmpay_webhook_secret', secret);
+        const secret = config.gpmpayWebhookSecret || crypto.randomBytes(32).toString('hex');
+        const prevStored = db.getSetting('gpmpay_webhook_secret') || '';
+        if (!config.gpmpayWebhookSecret) db.setSetting('gpmpay_webhook_secret', secret);
+        try {
+            await client.webhookSettings.createHmacEndpoint({ url, name: ENDPOINT_NAME, secret });
+        } catch (e) {
+            if (!config.gpmpayWebhookSecret) db.setSetting('gpmpay_webhook_secret', prevStored);
+            throw e;
+        }
         return { url, action: 'created' };
     } catch (err) {
         throw new Error(friendlyError(err));
