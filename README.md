@@ -1,17 +1,19 @@
 # Telegram Auto-Sales Bot
 
-**v2.3.0** · [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/new?repo=https://github.com/maingocanh1702/telegram-sales-bot)
+**v2.4.0** · [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/new?repo=https://github.com/maingocanh1702/telegram-sales-bot)
 
 > 🚀 **Tìm kiếm phiên bản SaaS Multi-Tenant & Quản lý CTV?**
 > Hãy tham khảo **[BotShopez](https://botshopez.com)** — Nền tảng SaaS Telegram Bot hoàn chỉnh với kiến trúc Monorepo (Next.js 15, NestJS 11, PostgreSQL, Redis BullMQ, Grammy). Hỗ trợ nhiều shop tập trung, phân quyền RBAC (Owner / Admin / CTV), chia sẻ kho hàng (shared stock), tự động đối soát hoa hồng & công nợ CTV!
 
-Bot bán hàng Telegram tự động (phiên bản Standalone / Single-Shop): khách chọn sản phẩm → chọn số lượng → **Mua ngay** hoặc **Thêm vào giỏ** → thanh toán VietQR → hệ thống tự xác nhận thanh toán qua SePay Webhook → tự động gửi thông tin tài khoản / credentials ngay lập tức.
+Bot bán hàng Telegram tự động (phiên bản Standalone / Single-Shop): khách chọn sản phẩm → chọn số lượng → **Mua ngay** hoặc **Thêm vào giỏ** → thanh toán chuyển khoản VND (VietQR / **GPM Pay**), USDT hoặc PayPal → hệ thống tự xác nhận thanh toán qua Webhook (SePay / GPM Pay) → tự động gửi thông tin tài khoản / credentials ngay lập tức.
 
 ## Tech Stack
 
 - **Node.js** + `node-telegram-bot-api`
 - **SQLite** (`sql.js`)
 - **SePay** Webhook (Auto-verify thanh toán ngân hàng thời gian thực)
+- **GPM Pay** (`@gpmpay/sdk`) — Webhook HMAC xác thực chuyển khoản, tạo QR VietQR
+- **qrcode** — Render mã QR thành ảnh PNG gửi trực tiếp trong chat
 - **VietQR** Quicklink (Tạo mã QR động chuyển khoản chính xác nội dung & số tiền)
 - **Express.js** (Server tiếp nhận Webhook & Admin Dashboard)
 
@@ -99,6 +101,11 @@ npm test
 | `WEBHOOK_PATH` | ❌ | Đường dẫn tiếp nhận webhook SePay | `/webhook/sepay` |
 | `DB_PATH` | ❌ | Đường dẫn file database SQLite | `/data/bot.db` |
 | `ORDER_EXPIRY_MINUTES` | ❌ | Thời gian hết hạn đơn hàng (phút) | `5` |
+| `GPMPAY_API_TOKEN` | ❌ | API Token GPM Pay — có giá trị thì bật phương thức GPM Pay | `gpm_...` |
+| `GPMPAY_API_URL` | ❌ | API URL GPM Pay | `https://api.gpmpay.com/api/v1` |
+| `GPMPAY_WEBHOOK_SECRET` | ❌* | Secret xác thực chữ ký webhook (*bắt buộc nếu dùng GPM Pay) | `whsec_...` |
+
+> Không commit file `.env` lên Git. Sau mỗi lần sửa `.env` cần khởi động lại bot.
 
 ---
 
@@ -109,7 +116,9 @@ npm test
 | 🛍 **Sản phẩm & Danh mục** | Phân loại theo danh mục, hiển thị nổi bật, xem tồn kho real-time |
 | 🛒 **Giỏ hàng thông minh** | Đặt nhiều sản phẩm cùng lúc, tùy chỉnh số lượng, Mua ngay hoặc Thêm vào giỏ |
 | 💳 **Thanh toán VietQR & SePay** | Tự động tạo mã QR chính xác nội dung, webhook bắt giao dịch và khớp đơn tức thì |
-| ⚡️ **Giao hàng tự động** | Trả thông tin tài khoản / license key ngay khi thanh toán thành công |
+| 🏦 **Thanh toán GPM Pay** | Webhook HMAC qua SDK chính thức, chống xử lý trùng (idempotent), kiểm tra đúng số tiền, QR gửi dạng ảnh PNG kèm thông tin đơn |
+| 💱 **Đa phương thức** | VND (gộp VietQR/GPM Pay thành một nút), USDT, PayPal; ghi nhớ phương thức mặc định |
+| ⚡️ **Giao hàng tự động** | Trả thông tin tài khoản / license key ngay khi thanh toán thành công; nội dung dài (>4000 ký tự) tự gửi dạng file `.txt` |
 | 🎟 **Mã giảm giá** | Hỗ trợ giảm theo % hoặc số tiền cố định, giới hạn lượt dùng |
 | 🌐 **Đa ngôn ngữ (i18n)** | Hỗ trợ song ngữ Tiếng Việt 🇻🇳 và Tiếng Anh 🇬🇧 |
 | 📊 **Admin Dashboard** | Giao diện web quản lý sản phẩm, đơn hàng, tồn kho và credentials |
@@ -159,6 +168,92 @@ npm test
 4. Lưu cấu hình và thực hiện giao dịch thử nghiệm.
 
 > **Lưu ý:** Webhook URL cần phải là URL công khai có HTTPS (domain dịch vụ hosting hoặc reverse proxy công khai).
+
+---
+
+## 🏦 Cấu hình GPM Pay
+
+GPM Pay không giữ trạng thái đơn hàng: bot nhúng mã đơn (`ORD...`) vào nội dung chuyển khoản, tự tạo QR VietQR, khi webhook về sẽ khớp mã đơn và kiểm tra đúng số tiền.
+
+1. Tạo API Token tại [app.gpmpay.com/api-tokens](https://app.gpmpay.com/api-tokens) → điền `GPMPAY_API_TOKEN`.
+2. Thêm tài khoản ngân hàng nhận tiền trong Admin Dashboard (đúng BIN và số tài khoản).
+3. Đăng ký endpoint webhook để lấy secret:
+
+```bash
+node -e "
+require('dotenv').config();
+const { GpmPay } = require('@gpmpay/sdk');
+new GpmPay({ apiToken: process.env.GPMPAY_API_TOKEN })
+  .webhookSettings.createHmacEndpoint({ url: 'https://<domain-cua-ban>/webhook/gpmpay' })
+  .then(({ secret }) => console.log('SECRET:', secret));
+"
+```
+
+4. Điền secret vào `GPMPAY_WEBHOOK_SECRET`, khởi động lại bot.
+
+Endpoint: `POST /webhook/gpmpay` (xác thực chữ ký trên raw body, bỏ qua payload `test`, xử lý trùng theo `payload.id`).
+
+---
+
+## 🖥 Triển khai trên Proxmox LXC (Debian) + Cloudflare Tunnel
+
+Không cần mở cổng hay lộ IP public: `cloudflared` tạo kết nối outbound từ LXC tới Cloudflare.
+
+```bash
+# 1. Cài Node.js 18+ và clone
+git clone https://github.com/lucduong2406/telegram-sales-bot.git /opt/telegram-sales-bot
+cd /opt/telegram-sales-bot && npm install
+cp .env.example .env && nano .env
+
+# 2. Cài cloudflared (Debian trixie: tải trực tiếp file .deb)
+curl -L -o cloudflared.deb https://pkg.cloudflare.com/cloudflared/latest/cloudflared-linux-amd64.deb
+apt install -y ./cloudflared.deb
+```
+
+Trong Cloudflare Zero Trust → Tunnels, tạo tunnel và thêm Public Hostname trỏ domain của bạn tới `http://127.0.0.1:3000`.
+
+Tạo service systemd `/etc/systemd/system/telegram-bot.service`:
+
+```ini
+[Unit]
+Description=Telegram Sales Bot
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/telegram-sales-bot
+ExecStart=/usr/bin/node src/bot.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+systemctl daemon-reload && systemctl enable --now telegram-bot
+```
+
+Cập nhật phiên bản mới:
+
+```bash
+cd /opt/telegram-sales-bot && git pull origin main && npm install && systemctl restart telegram-bot
+journalctl -u telegram-bot -f
+```
+
+> Đảm bảo chỉ có một tiến trình bot chạy (tránh lỗi `EADDRINUSE :::3000`).
+
+---
+
+## 📝 Changelog
+
+### v2.4.0
+- Thêm thanh toán **GPM Pay** (SDK chính thức, webhook HMAC, idempotency, kiểm tra số tiền).
+- QR thanh toán gửi dạng ảnh PNG trực tiếp trong chat (không còn link), nội dung đơn hiển thị phía trên ảnh QR.
+- Gộp các nút VietQR/GPM Pay thành một nút **VND**; sửa lỗi tổng tiền hiển thị 0đ ở bước chọn thanh toán.
+- Sửa lỗi hiển thị placeholder `{bank}`, `{account}`... trong thông tin thanh toán.
+- Sửa lỗi giao hàng thất bại khi nội dung credentials vượt giới hạn tin nhắn Telegram (gửi file `.txt`).
+- Bổ sung hướng dẫn triển khai Proxmox LXC + Cloudflare Tunnel.
 
 ---
 
