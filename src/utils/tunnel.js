@@ -117,6 +117,21 @@ function scheduleRestart(port) {
 }
 
 /**
+ * cloudflared prints the URL before the edge routes it to us (404/530 for a few
+ * seconds). Poll our own health route through the tunnel until it answers.
+ */
+async function waitUntilReachable(url, { fetchFn = fetch, attempts = 30, delayMs = 2000 } = {}) {
+    for (let i = 0; i < attempts; i++) {
+        try {
+            const r = await fetchFn(url + '/', { signal: AbortSignal.timeout(5000) });
+            if (r.ok) return true;
+        } catch (_) { /* DNS/edge not ready yet */ }
+        if (i < attempts - 1) await new Promise((res) => setTimeout(res, delayMs));
+    }
+    return false;
+}
+
+/**
  * Start the quick tunnel (idempotent). Resolves with the public https URL.
  * Calls the registered onUrl callback every time a (new) URL becomes available.
  */
@@ -129,6 +144,9 @@ function start(port) {
         try {
             const bin = await ensureBinary();
             const url = await spawnTunnel(bin, port);
+            if (!(await waitUntilReachable(url))) {
+                throw new Error('Domain tunnel chưa truy cập được từ internet sau 60s, thử bật lại sau ít phút');
+            }
             state.url = url;
             state.error = null;
             console.log(`🌐 Cloudflare Tunnel: ${url}`);
@@ -178,4 +196,4 @@ function getStatus() {
 
 process.on('exit', () => { if (state.proc) state.proc.kill(); });
 
-module.exports = { parseTunnelUrl, ensureBinary, start, stop, getStatus, setOnUrl };
+module.exports = { parseTunnelUrl, waitUntilReachable, ensureBinary, start, stop, getStatus, setOnUrl };

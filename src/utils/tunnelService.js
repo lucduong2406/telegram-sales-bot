@@ -6,15 +6,21 @@ const { registerWebhook } = require('./gpmpayWebhookRegister');
 const state = { webhookUrl: null, registeredAt: null, registerError: null };
 
 async function register(url) {
-    try {
-        const r = await registerWebhook(url);
-        state.webhookUrl = r.url;
-        state.registeredAt = new Date().toISOString();
-        state.registerError = null;
-        console.log(`✅ GPM Pay webhook ${r.action}: ${r.url}`);
-    } catch (err) {
-        state.registerError = err.message;
-        throw err;
+    // GPM Pay pings the URL while saving; retry a few times in case the edge is still warming up
+    const attempts = 3;
+    for (let i = 1; i <= attempts; i++) {
+        try {
+            const r = await registerWebhook(url);
+            state.webhookUrl = r.url;
+            state.registeredAt = new Date().toISOString();
+            state.registerError = null;
+            console.log(`✅ GPM Pay webhook ${r.action}: ${r.url}`);
+            return;
+        } catch (err) {
+            state.registerError = err.message;
+            if (i === attempts || /webhooks:manage|GPMPAY_API_TOKEN/.test(err.message)) throw err;
+            await new Promise((res) => setTimeout(res, 5000));
+        }
     }
 }
 

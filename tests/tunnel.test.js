@@ -1,4 +1,4 @@
-const { parseTunnelUrl } = require('../src/utils/tunnel');
+const { parseTunnelUrl, waitUntilReachable } = require('../src/utils/tunnel');
 const db = require('../src/database');
 const config = require('../src/config');
 const { registerWebhook, getWebhookSecret } = require('../src/utils/gpmpayWebhookRegister');
@@ -11,6 +11,22 @@ describe('parseTunnelUrl', () => {
     it('returns null when no URL yet', () => {
         expect(parseTunnelUrl('INF Requesting new quick Tunnel on trycloudflare.com...')).toBeNull();
         expect(parseTunnelUrl('')).toBeNull();
+    });
+});
+
+describe('waitUntilReachable', () => {
+    it('retries past 404s until the tunnel answers', async () => {
+        const f = vi.fn()
+            .mockResolvedValueOnce({ ok: false, status: 404 })
+            .mockRejectedValueOnce(new Error('ENOTFOUND'))
+            .mockResolvedValueOnce({ ok: true });
+        expect(await waitUntilReachable('https://a.trycloudflare.com', { fetchFn: f, attempts: 5, delayMs: 1 })).toBe(true);
+        expect(f).toHaveBeenCalledTimes(3);
+    });
+    it('gives up after the attempt limit', async () => {
+        const f = vi.fn().mockResolvedValue({ ok: false, status: 404 });
+        expect(await waitUntilReachable('https://a.trycloudflare.com', { fetchFn: f, attempts: 3, delayMs: 1 })).toBe(false);
+        expect(f).toHaveBeenCalledTimes(3);
     });
 });
 
