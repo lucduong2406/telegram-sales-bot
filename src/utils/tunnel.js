@@ -1,5 +1,6 @@
 const { spawn, execFileSync } = require('child_process');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const BIN_DIR = path.join(__dirname, '..', '..', 'bin');
@@ -59,8 +60,12 @@ async function ensureBinary() {
 
 function spawnTunnel(bin, port) {
     return new Promise((resolve, reject) => {
+        // Quick tunnels ignore-or-break when a named-tunnel ~/.cloudflared/config.yml exists
+        // (edge answers 530/1033). Point cloudflared at an empty config to isolate it.
+        const emptyCfg = path.join(os.tmpdir(), 'cloudflared-quick-empty.yml');
+        fs.writeFileSync(emptyCfg, '# intentionally empty: quick tunnel\n');
         // http2 (TCP) works on networks/LXC where QUIC (UDP) is blocked or throttled
-        const proc = spawn(bin, ['tunnel', '--no-autoupdate', '--protocol', 'http2', '--url', `http://127.0.0.1:${port}`], {
+        const proc = spawn(bin, ['tunnel', '--config', emptyCfg, '--no-autoupdate', '--protocol', 'http2', '--url', `http://127.0.0.1:${port}`], {
             stdio: ['ignore', 'pipe', 'pipe'],
         });
         state.proc = proc;
@@ -92,6 +97,8 @@ function spawnTunnel(bin, port) {
             for (const line of lines) {
                 const clean = line.replace(/^\S+\s+/, '').trim();
                 if (clean) { tail.push(clean.slice(0, 160)); if (tail.length > 8) tail.shift(); }
+                // Surface connection problems in the service log for diagnosis
+                if (/\b(ERR|WRN)\b|Registered tunnel connection/.test(line)) console.log('[cloudflared]', line.trim().slice(0, 240));
                 url = url || parseTunnelUrl(line);
                 if (/Registered tunnel connection/i.test(line)) connected = true;
             }

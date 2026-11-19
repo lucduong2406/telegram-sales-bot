@@ -6,8 +6,9 @@ const { registerWebhook } = require('./gpmpayWebhookRegister');
 const state = { webhookUrl: null, registeredAt: null, registerError: null };
 
 async function register(url) {
-    // GPM Pay pings the URL while saving; retry a few times in case the edge is still warming up
-    const attempts = 3;
+    // GPM Pay pings the URL while saving; a fresh quick-tunnel hostname can take a while to
+    // become routable at the edge (404 / 530), so retry with a longer window (~50s)
+    const attempts = 6;
     for (let i = 1; i <= attempts; i++) {
         try {
             const r = await registerWebhook(url);
@@ -19,7 +20,7 @@ async function register(url) {
         } catch (err) {
             state.registerError = err.message;
             if (i === attempts || /webhooks:manage|GPMPAY_API_TOKEN/.test(err.message)) throw err;
-            await new Promise((res) => setTimeout(res, 5000));
+            await new Promise((res) => setTimeout(res, 10000));
         }
     }
 }
