@@ -2267,7 +2267,8 @@ Số Lượng Đang Hiện Có 10"
     // ==================== Customers ====================
     async function loadCustomers() {
       try {
-        const customers = await apiFetch('/customers');
+        const res = await apiFetch('/customers');
+        const customers = Array.isArray(res) ? res : (res.customers || []);
         let html = '<table><tr><th>Khách hàng</th><th>Đơn hàng</th><th>Doanh thu</th><th>SP đã mua</th><th>Lần mua cuối</th><th></th></tr>';
         if (customers.length === 0) {
           html += '<tr><td colspan="6"><div class="empty-state"><i class="ph ph-users-three"></i><p>Chưa có khách hàng</p></div></td></tr>';
