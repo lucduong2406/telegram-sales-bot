@@ -8,7 +8,7 @@ const { t, getLang } = require('../locales');
  * Deliver credentials or notify admin for invite-type products
  * after successful payment.
  */
-async function deliverCredentials(bot, order) {
+async function deliverCredentials(bot, order, opts = {}) {
     // Determine product type
     const product = db.getProductById(order.product_id);
     const productType = product ? product.product_type : 'credential';
@@ -18,7 +18,7 @@ async function deliverCredentials(bot, order) {
     } else if (productType === 'preorder') {
         return deliverPreorder(bot, order, product);
     } else {
-        return deliverCredential(bot, order, product);
+        return deliverCredential(bot, order, product, opts);
     }
 }
 
@@ -128,7 +128,7 @@ async function deliverInvite(bot, order, product) {
 /**
  * Credential products: auto deliver credentials to customer (existing flow)
  */
-async function deliverCredential(bot, order, product) {
+async function deliverCredential(bot, order, product, opts = {}) {
     try {
         // Set status to 'delivering' BEFORE attempting to send
         db.updateOrderStatus(order.order_code, 'delivering');
@@ -141,10 +141,12 @@ async function deliverCredential(bot, order, product) {
                 `Need ${order.quantity}, have ${credentials.length}`
             );
 
-            bot.sendMessage(order.telegram_user_id,
-                `⚠️ Đơn hàng #${order.order_code} đã được thanh toán.\n\n` +
-                `Tuy nhiên, sản phẩm tạm thời hết stock. Admin sẽ liên hệ bạn sớm nhất!`
-            );
+            if (!opts.quiet) {
+                bot.sendMessage(order.telegram_user_id,
+                    `⚠️ Đơn hàng #${order.order_code} đã được thanh toán.\n\n` +
+                    `Tuy nhiên, sản phẩm tạm thời hết stock. Admin sẽ liên hệ bạn sớm nhất!`
+                ).catch(() => {});
+            }
             // Status stays 'delivering' — admin can see and handle
             return false;
         }
@@ -379,4 +381,41 @@ function formatDeliveryDateFromDate(date) {
     return `${day}/${month}/${year} ${hours}:${minutes}`;
 }
 
-module.exports = { deliverCredentials, setupInviteConfirmHandler };
+/**
+ * Admin "🔄 Giao lại" button for orders stuck in paid/delivering
+ */
+function setupRedeliverHandler(bot) {
+    bot.on('callback_query', async (query) => {
+        if (!query.data || !query.data.startsWith(CALLBACKS.REDELIVER_PREFIX)) return;
+        if (query.from.id !== config.adminTelegramId) {
+            bot.answerCallbackQuery(query.id, { text: '⛔ Chỉ admin' }).catch(() => {});
+            return;
+        }
+
+        const orderCode = query.data.replace(CALLBACKS.REDELIVER_PREFIX, '');
+        const order = db.getOrderByCode(orderCode);
+        if (!order) {
+            bot.answerCallbackQuery(query.id, { text: '❌ Đơn không tồn tại' }).catch(() => {});
+            return;
+        }
+        if (!['paid', 'delivering'].includes(order.status)) {
+            bot.answerCallbackQuery(query.id, { text: `Đơn đang ở trạng thái ${order.status}` }).catch(() => {});
+            return;
+        }
+
+        bot.answerCallbackQuery(query.id, { text: '⏳ Đang giao lại...' }).catch(() => {});
+        let ok = false;
+        try {
+            ok = await deliverCredentials(bot, order, { quiet: true });
+        } catch (err) {
+            console.error(`Redeliver failed for ${orderCode}:`, err.message);
+        }
+        bot.sendMessage(query.message.chat.id, ok
+            ? `✅ Đã giao lại đơn #${orderCode}`
+            : `❌ Giao lại đơn #${orderCode} thất bại (kho còn đủ hàng chưa? xem log).`,
+            ok ? {} : { reply_markup: { inline_keyboard: [[{ text: '🔄 Thử lại', callback_data: `${CALLBACKS.REDELIVER_PREFIX}${orderCode}` }]] } }
+        ).catch(() => {});
+    });
+}
+
+module.exports = { deliverCredentials, setupInviteConfirmHandler, setupRedeliverHandler };

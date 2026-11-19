@@ -16,12 +16,13 @@ const { setupAdminHandler } = require('./handlers/adminHandler');
 const { setupAdminAPI } = require('./handlers/adminAPI');
 const { setupProfileHandler } = require('./handlers/profileHandler');
 const { setupHelpHandler, setupGuideCallback } = require('./handlers/helpHandler');
-const { setupInviteConfirmHandler } = require('./handlers/deliveryHandler');
+const { setupInviteConfirmHandler, setupRedeliverHandler } = require('./handlers/deliveryHandler');
 const { setupDiscountHandler } = require('./handlers/discountHandler');
 const { setupCartHandler } = require('./handlers/cartHandler');
 const { setupCurrencyHandler } = require('./handlers/currencyHandler');
 const { startOrderExpiryCheck } = require('./utils/orderExpiry');
 const { startSepayPoller } = require('./utils/sepayPoller');
+const { startBackupScheduler } = require('./utils/backup');
 const { setupScheduler } = require('./scheduler');
 const { setupCheckerAPI } = require('./handlers/checkerAPI');
 const { setupGpmPayWebhookHandler } = require('./handlers/gpmpayWebhookHandler');
@@ -152,6 +153,7 @@ async function main() {
     setupEmailHandler(bot);
     setupOrderHandler(bot);
     setupInviteConfirmHandler(bot);
+    setupRedeliverHandler(bot);
     setupDiscountHandler(bot);
     setupCartHandler(bot);
     setupCurrencyHandler(bot);
@@ -162,6 +164,9 @@ async function main() {
 
     // 8. Start order expiry checker
     startOrderExpiryCheck(bot);
+
+    // Database backups
+    startBackupScheduler(bot);
 
     // 9. Start SePay polling backup (reconciles missed webhooks)
     startSepayPoller(bot);

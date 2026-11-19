@@ -1,8 +1,7 @@
 const express = require('express');
-const db = require('../database');
 const config = require('../config');
 const { constructWebhookEvent } = require('@gpmpay/sdk/webhooks');
-const { deliverCredentials } = require('./deliveryHandler');
+const { processIncomingPayment } = require('../utils/paymentProcessor');
 
 /**
  * Setup Express route for GPM Pay webhook.
@@ -59,14 +58,6 @@ function setupGpmPayWebhookHandler(app, bot) {
 
             console.log(`📥 GPM Pay webhook: ${payload.transferType} ${amount} — content: ${content}`);
 
-            // Idempotency: skip already processed transactions
-            // GPM Pay retries up to 6 times (10s, 30s, 2m, 10m, 1h, 6h)
-            if (db.isTransactionProcessed(transactionId)) {
-                console.log(`🔁 GPM Pay: Duplicate transaction ${transactionId}, skipping`);
-                res.json({ success: true });
-                return;
-            }
-
             // Extract order code from transfer content (e.g. "ORD17123456789012345")
             const orderCodeMatch = content.match(/ORD\d{13,20}/);
             if (!orderCodeMatch) {
@@ -74,87 +65,13 @@ function setupGpmPayWebhookHandler(app, bot) {
                 res.json({ success: true });
                 return;
             }
-            const orderCode = orderCodeMatch[0];
 
-            // Find pending order
-            const order = db.getPendingOrderByCode(orderCode);
-            if (!order) {
-                console.log(`⚠️ GPM Pay: No pending order: ${orderCode}`);
-                res.json({ success: true });
-                return;
-            }
-
-            // Verify amount — must match exactly (integer VND)
-            if (amount !== order.total_amount) {
-                console.log(
-                    `⚠️ GPM Pay: Amount mismatch for ${orderCode} — ` +
-                    `received ${amount}, expected ${order.total_amount}`
-                );
-
-                // Mark as processed to avoid reprocessing underpayment
-                db.markTransactionProcessed(transactionId, orderCode, amount);
-
-                bot.sendMessage(order.telegram_user_id,
-                    `⚠️ Đơn hàng #${orderCode}: Số tiền nhận được (${amount.toLocaleString('vi-VN')} đ) ` +
-                    `chưa đủ (cần ${order.total_amount.toLocaleString('vi-VN')} đ).\n` +
-                    `Vui lòng chuyển thêm hoặc liên hệ admin.`
-                ).catch(() => {});
-
-                res.json({ success: true });
-                return;
-            }
-
-            // ✅ Payment confirmed!
-            console.log(`✅ GPM Pay: Payment confirmed: ${orderCode} (${amount} đ)`);
-            db.updateOrderStatus(orderCode, 'paid');
-            db.markTransactionProcessed(transactionId, orderCode, amount);
-
-            // Record discount usage on successful payment
-            if (order.discount_code) {
-                const discountObj = db.getDiscountCodeByCode(order.discount_code);
-                if (discountObj) {
-                    db.useDiscountCode(discountObj.id, order.telegram_user_id, orderCode);
-                }
-            }
-
-            // Notify user
-            await bot.sendMessage(order.telegram_user_id,
-                `✅ Đã xác nhận thanh toán cho đơn hàng #${orderCode}!\n\n` +
-                `Đang gửi thông tin sản phẩm...`
-            );
-
-            // Deliver credentials with robust error handling
-            try {
-                const delivered = await deliverCredentials(bot, order);
-                if (!delivered) {
-                    console.error(`⚠️ GPM Pay: deliverCredentials returned false for ${orderCode}`);
-                    bot.sendMessage(config.adminTelegramId,
-                        `⚠️ **GIAO HÀNG THẤT BẠI** (GPM Pay)\n\n` +
-                        `Đơn: #${orderCode}\n` +
-                        `SP: ${order.product_name} x${order.quantity}\n` +
-                        `Khách: @${order.telegram_username || order.telegram_user_id}\n\n` +
-                        `Vui lòng kiểm tra stock và giao thủ công.`,
-                        { parse_mode: 'Markdown' }
-                    ).catch(() => {});
-                }
-            } catch (deliveryErr) {
-                console.error(`❌ GPM Pay: deliverCredentials threw for ${orderCode}:`, deliveryErr.message);
-                bot.sendMessage(config.adminTelegramId,
-                    `❌ **LỖI GIAO HÀNG** (GPM Pay)\n\n` +
-                    `Đơn: #${orderCode}\nLỗi: ${deliveryErr.message}\n\n` +
-                    `Vui lòng giao thủ công.`,
-                    { parse_mode: 'Markdown' }
-                ).catch(() => {});
-            }
-
-            // Notify admin about payment
-            bot.sendMessage(config.adminTelegramId,
-                `💰 Đơn hàng #${orderCode} đã thanh toán qua **GPM Pay**!\n` +
-                `SP: ${order.product_name} x${order.quantity}\n` +
-                `Số tiền: ${amount.toLocaleString('vi-VN')} đ\n` +
-                `Khách: @${order.telegram_username || order.telegram_user_id}`
-            ).catch((err) => {
-                console.warn('[GPM Pay Webhook] Failed to notify admin:', err.message);
+            // Idempotent (by payload.id), handles late payment / overpayment / duplicates
+            await processIncomingPayment(bot, {
+                orderCode: orderCodeMatch[0],
+                amount,
+                transactionId,
+                source: 'GPM Pay',
             });
 
             res.json({ success: true });

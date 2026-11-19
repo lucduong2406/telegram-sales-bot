@@ -902,6 +902,11 @@ function setupAdminAPI(app, bot) {
             stmt.free();
 
             if (credentials.length === 0) {
+                // Paid but never delivered (e.g. out of stock / send failed) → run normal delivery
+                if (['paid', 'delivering'].includes(order.status)) {
+                    const ok = await deliverCredentials(bot, order, { quiet: true });
+                    return res.json({ message: ok ? 'Delivered to customer' : 'Delivery failed (check stock / logs)' });
+                }
                 return res.status(400).json({ error: true, message: 'No credentials found for this order', code: 'NO_CREDENTIALS' });
             }
 

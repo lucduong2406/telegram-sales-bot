@@ -1,6 +1,6 @@
 const db = require('../database');
 const config = require('../config');
-const { deliverCredentials } = require('./deliveryHandler');
+const { processIncomingPayment } = require('../utils/paymentProcessor');
 
 /**
  * Setup Express route for SePay webhook
@@ -47,81 +47,12 @@ function setupWebhookHandler(app, bot) {
 
             console.log(`🔍 Order: ${orderCode}, amount: ${amount}`);
 
-            // Find pending order
-            const order = db.getPendingOrderByCode(orderCode);
-
-            if (!order) {
-                console.log(`⚠️ No pending order: ${orderCode}`);
-                res.json({ success: true });
-                return;
-            }
-
-            // Verify amount
-            if (amount < order.total_amount) {
-                console.log(`⚠️ Amount mismatch: ${orderCode} — ${amount} < ${order.total_amount}`);
-
-                bot.sendMessage(order.telegram_user_id,
-                    `⚠️ Đơn hàng #${orderCode}: Số tiền nhận được (${amount.toLocaleString('vi-VN')} đ) ` +
-                    `chưa đủ (cần ${order.total_amount.toLocaleString('vi-VN')} đ).\n` +
-                    `Vui lòng chuyển thêm hoặc liên hệ admin.`
-                );
-
-                res.json({ success: true });
-                return;
-            }
-
-            // ✅ Payment confirmed!
-            console.log(`✅ Payment confirmed: ${orderCode}`);
-            db.updateOrderStatus(orderCode, 'paid');
-
-            // Record discount usage on successful payment
-            if (order.discount_code) {
-                const discountObj = db.getDiscountCodeByCode(order.discount_code);
-                if (discountObj) {
-                    db.useDiscountCode(discountObj.id, order.telegram_user_id, orderCode);
-                }
-            }
-
-            // Notify user
-            await bot.sendMessage(order.telegram_user_id,
-                `✅ Đã xác nhận thanh toán cho đơn hàng #${orderCode}!\n\n` +
-                `Đang gửi thông tin sản phẩm...`
-            );
-
-            // Deliver credentials with robust error handling
-            try {
-                const delivered = await deliverCredentials(bot, order);
-                if (!delivered) {
-                    console.error(`⚠️ deliverCredentials returned false for ${orderCode}`);
-                    // Notify admin about delivery failure
-                    bot.sendMessage(config.adminTelegramId,
-                        `⚠️ **GIAO HÀNG THẤT BẠI**\n\n` +
-                        `Đơn: #${orderCode}\n` +
-                        `SP: ${order.product_name} x${order.quantity}\n` +
-                        `Khách: @${order.telegram_username || order.telegram_user_id}\n\n` +
-                        `Vui lòng kiểm tra stock và giao thủ công.`,
-                        { parse_mode: 'Markdown' }
-                    ).catch(() => {});
-                }
-            } catch (deliveryErr) {
-                console.error(`❌ deliverCredentials threw for ${orderCode}:`, deliveryErr.message);
-                bot.sendMessage(config.adminTelegramId,
-                    `❌ **LỖI GIAO HÀNG**\n\n` +
-                    `Đơn: #${orderCode}\n` +
-                    `Lỗi: ${deliveryErr.message}\n\n` +
-                    `Vui lòng giao thủ công.`,
-                    { parse_mode: 'Markdown' }
-                ).catch(() => {});
-            }
-
-            // Notify admin about payment
-            bot.sendMessage(config.adminTelegramId,
-                `💰 Đơn hàng #${orderCode} đã thanh toán!\n` +
-                `SP: ${order.product_name} x${order.quantity}\n` +
-                `Số tiền: ${amount.toLocaleString('vi-VN')} đ\n` +
-                `Khách: @${order.telegram_username || order.telegram_user_id}`
-            ).catch((err) => {
-                console.warn('[Webhook] Failed to notify admin:', err.message);
+            // Handles late payment / overpayment / duplicates
+            await processIncomingPayment(bot, {
+                orderCode,
+                amount,
+                transactionId: payload.id ? `sepay_${payload.id}` : null,
+                source: 'SePay',
             });
 
             res.json({ success: true });

@@ -1417,6 +1417,7 @@ function getVisibleProducts(userCurrency = 'VND') {
 module.exports = {
     initDatabase,
     saveDatabase,
+    DB_PATH,
     getDb,
     // Categories
     getCategories,

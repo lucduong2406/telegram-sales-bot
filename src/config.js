@@ -62,6 +62,10 @@ const config = {
   supportUsername: process.env.SUPPORT_USERNAME || '@maingocanh',
   supportUrl: `https://t.me/${(process.env.SUPPORT_USERNAME || '@maingocanh').replace('@', '')}`,
 
+  // Database backup
+  backupIntervalHours: parseFloat(process.env.BACKUP_INTERVAL_HOURS) || 6,
+  backupKeep: parseInt(process.env.BACKUP_KEEP) || 28,
+
   // GPM Pay
   gpmpayApiToken: process.env.GPMPAY_API_TOKEN,
   gpmpayApiUrl: process.env.GPMPAY_API_URL || 'https://api.gpmpay.com/api/v1',
