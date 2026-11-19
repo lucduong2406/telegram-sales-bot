@@ -304,6 +304,32 @@
     .filter-bar input, .filter-bar select { width: auto; min-width: 140px; }
     .card.pad { padding: var(--sp-200); }
 
+    /* ---------- Settings page ---------- */
+    .group-title { font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); margin: var(--sp-300) 0 var(--sp-100); }
+    .page-header + .group-title { margin-top: 0; }
+    .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-300); align-items: start; }
+    .settings-grid > .card, .stack > .card { margin-bottom: 0; height: auto; }
+    .stack { display: flex; flex-direction: column; gap: var(--sp-300); }
+    .card > .form-group:first-of-type { margin-top: var(--sp-200); }
+    .card-body { padding: 0 var(--sp-300) var(--sp-200); }
+    .card-note { padding: var(--sp-100) var(--sp-300); border-top: 1px solid var(--border); font-size: 12px; line-height: 16px; color: var(--text-muted); }
+    .setting-row { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-300); padding: var(--sp-200) var(--sp-300); }
+    .setting-title { font-size: 14px; line-height: 20px; font-weight: 500; color: var(--text-primary); }
+    .setting-text .hint code, .setting-title code { font-size: 12px; }
+    .label-note { font-weight: 400; color: var(--text-muted); }
+    .copy-row { display: flex; gap: var(--sp-75); align-items: center; }
+    .copy-row .btn { flex-shrink: 0; }
+    .switch { position: relative; display: inline-block; flex-shrink: 0; width: 44px; height: 24px; margin: 0 !important; cursor: pointer; }
+    .switch input { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 1; }
+    .switch .track { position: absolute; inset: 0; border-radius: var(--r-full); background: var(--border-strong); transition: background-color .15s; }
+    .switch .track::after { content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: var(--r-full); background: #fff; transition: transform .15s; }
+    .switch input:checked + .track { background: var(--action); }
+    .switch input:checked + .track::after { transform: translateX(20px); }
+    .switch input:focus-visible + .track { box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px var(--accent); }
+    .switch input:disabled { cursor: not-allowed; }
+    .switch input:disabled + .track { opacity: .5; }
+    @media (max-width: 900px) { .settings-grid { grid-template-columns: minmax(0, 1fr); } }
+
     @media (max-width: 768px) {
       .sidebar { display: none; }
       .main { margin-left: 0; padding: var(--sp-200); }
@@ -584,89 +610,97 @@ Số Lượng Đang Hiện Có 10"
       </div>
 
       <div class="section" id="sec-settings">
-        <div class="page-header" style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <h1>Cài đặt</h1>
-            <p>Quản lý tài khoản ngân hàng nhận thanh toán</p>
-          </div>
-          <button class="btn btn-primary" onclick="openBankModal()">
-            <i class="ph ph-plus" style="font-size:16px"></i> Thêm TK
-          </button>
+        <div class="page-header">
+          <h1>Cài đặt</h1>
+          <p>Thanh toán, cửa hàng và hành vi của bot</p>
         </div>
+
+        <h2 class="group-title">Thanh toán</h2>
+
         <div class="card">
           <div class="card-header">
             <h3><i class="ph ph-bank"></i> Tài khoản ngân hàng</h3>
+            <button class="btn btn-sm btn-primary" onclick="openBankModal()"><i class="ph ph-plus"></i> Thêm TK</button>
           </div>
           <div id="bankAccountsList"></div>
-        </div>
-        <p class="hint" style="margin-top:8px">💡 Tra mã BIN ngân hàng tại <a
-            href="https://www.vietqr.io/danh-sach-ngan-hang" target="_blank" style="color:var(--accent)">vietqr.io</a>.
-          TK đang active sẽ được dùng cho đơn hàng mới.</p>
-
-        <div class="card" style="margin-top:20px">
-          <div class="card-header">
-            <h3><i class="ph ph-ticket"></i> Hỏi mã giảm giá khi thanh toán</h3>
-          </div>
-          <div class="form-group">
-            <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
-              <input type="checkbox" id="discountPromptEnabled" onchange="saveDiscountPrompt()">
-              Hỏi khách "Nhập mã giảm giá / Bỏ qua" trước khi chọn thanh toán
-            </label>
-            <p class="hint">Tắt: khách đi thẳng tới bước thanh toán, không cần bấm "Bỏ qua" (áp dụng cho mọi khách).</p>
-          </div>
+          <p class="card-note">Tra mã BIN ngân hàng tại <a href="https://www.vietqr.io/danh-sach-ngan-hang" target="_blank" rel="noopener" style="color:var(--accent)">vietqr.io</a>. Tài khoản đang active sẽ được dùng cho đơn hàng mới.</p>
         </div>
 
-        <div class="card" style="margin-top:20px">
+        <div class="card">
           <div class="card-header">
             <h3><i class="ph ph-cloud"></i> Tunnel Cloudflare (không cần domain)</h3>
             <span id="tunnelBadge" class="badge badge-warning">Tắt</span>
           </div>
-          <div class="form-group">
-            <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
-              <input type="checkbox" id="tunnelEnabled" onchange="toggleTunnel()">
-              Tự tạo domain <code>*.trycloudflare.com</code> và đăng ký webhook với GPM Pay
+          <div class="setting-row">
+            <div class="setting-text">
+              <div class="setting-title">Tự tạo domain <code>*.trycloudflare.com</code></div>
+              <p class="hint">Dùng khi máy chủ chưa có domain. Bot tự tải và chạy <code>cloudflared</code>, lấy domain rồi đăng ký webhook với GPM Pay. Domain đổi mỗi lần tunnel khởi động lại; chạy lâu dài nên dùng domain riêng. Cần GPMPAY_API_TOKEN có quyền <code>webhooks:manage</code>.</p>
+            </div>
+            <label class="switch" aria-label="Bật tunnel Cloudflare">
+              <input type="checkbox" id="tunnelEnabled" onchange="toggleTunnel()"><span class="track"></span>
             </label>
-            <p class="hint">Dùng khi máy chủ chưa có domain. Bot tự tải/chạy <code>cloudflared</code>, lấy domain và đăng ký (cập nhật) webhook GPM Pay. Domain đổi mỗi lần tunnel khởi động lại — bot sẽ tự đăng ký lại. Chạy lâu dài nên dùng domain riêng. Cần GPMPAY_API_TOKEN có quyền <code>webhooks:manage</code>.</p>
           </div>
-          <div id="tunnelInfo" style="display:none">
+          <div id="tunnelInfo" class="card-body" style="display:none">
             <div class="form-group">
               <label>Domain tunnel</label>
-              <div style="display:flex;gap:8px"><input type="text" id="tunnelUrl" readonly><button class="btn btn-sm" onclick="copyTunnel('tunnelUrl')"><i class="ph ph-copy"></i></button></div>
+              <div class="copy-row"><input type="text" id="tunnelUrl" readonly><button class="btn btn-sm" onclick="copyTunnel('tunnelUrl')" title="Sao chép"><i class="ph ph-copy"></i> Sao chép</button></div>
             </div>
             <div class="form-group">
-              <label>URL webhook — dán vào GPM Pay nếu khai báo thủ công <span id="tunnelRegState" style="font-weight:400;color:var(--text-muted)"></span></label>
-              <div style="display:flex;gap:8px"><input type="text" id="tunnelWebhook" readonly><button class="btn btn-sm" onclick="copyTunnel('tunnelWebhook')"><i class="ph ph-copy"></i></button></div>
+              <label>URL webhook — dán vào GPM Pay nếu khai báo thủ công <span id="tunnelRegState" class="label-note"></span></label>
+              <div class="copy-row"><input type="text" id="tunnelWebhook" readonly><button class="btn btn-sm" onclick="copyTunnel('tunnelWebhook')" title="Sao chép"><i class="ph ph-copy"></i> Sao chép</button></div>
             </div>
-            <button class="btn btn-sm btn-primary" onclick="reregisterTunnel()"><i class="ph ph-arrows-clockwise"></i> Đăng ký lại với GPM Pay</button>
+            <button class="btn btn-sm" onclick="reregisterTunnel()"><i class="ph ph-arrows-clockwise"></i> Đăng ký lại với GPM Pay</button>
           </div>
-          <p id="tunnelError" class="hint" style="color:var(--danger);display:none"></p>
+          <p id="tunnelError" class="card-note" style="color:var(--danger);display:none"></p>
         </div>
 
-        <div class="card" style="margin-top:20px">
-          <div class="card-header">
-            <h3><i class="ph ph-hand-waving"></i> Lời chào khách hàng</h3>
-            <button class="btn btn-sm btn-primary" onclick="saveWelcome()"><i class="ph ph-floppy-disk"></i> Lưu</button>
-          </div>
-          <div class="form-group">
-            <label>Tên / tiêu đề cửa hàng (dòng in đậm trên cùng)</label>
-            <input type="text" id="welcomeTitle" maxlength="60" placeholder="CLOUDX SHOP">
-          </div>
-          <div class="form-group">
-            <label>Lời chào</label>
-            <textarea id="welcomeMessage" rows="3" maxlength="500" placeholder="👋 Chào mừng bạn đến với CloudX Shop!"></textarea>
-            <p class="hint">Hiện ở menu chính của bot, dùng chung cho mọi ngôn ngữ. Để trống cả hai ô để dùng lời chào mặc định.</p>
-          </div>
-        </div>
+        <h2 class="group-title">Cửa hàng và bot</h2>
 
-        <div class="card" style="margin-top:20px">
-          <div class="card-header">
-            <h3><i class="ph ph-chat-circle-text"></i> Liên hệ hỗ trợ</h3>
-            <button class="btn btn-sm btn-primary" onclick="saveSupportContact()"><i class="ph ph-floppy-disk"></i> Lưu</button>
+        <div class="settings-grid">
+          <div class="card">
+            <div class="card-header">
+              <h3><i class="ph ph-hand-waving"></i> Lời chào khách hàng</h3>
+              <button class="btn btn-sm btn-primary" onclick="saveWelcome()"><i class="ph ph-floppy-disk"></i> Lưu</button>
+            </div>
+            <div class="form-group">
+              <label>Tên / tiêu đề cửa hàng</label>
+              <input type="text" id="welcomeTitle" maxlength="60" placeholder="CLOUDX SHOP">
+              <p class="hint">Dòng in đậm trên cùng của menu chính.</p>
+            </div>
+            <div class="form-group">
+              <label>Lời chào</label>
+              <textarea id="welcomeMessage" rows="3" maxlength="500" placeholder="👋 Chào mừng bạn đến với CloudX Shop!"></textarea>
+              <p class="hint">Dùng chung cho mọi ngôn ngữ. Để trống cả hai ô để dùng lời chào mặc định.</p>
+            </div>
           </div>
-          <div class="form-group">
-            <label>Telegram hỗ trợ (nút "Hỗ trợ" / "Chat với Admin")</label>
-            <input type="text" id="supportUsername" placeholder="@username hoặc https://t.me/username">
-            <p class="hint">Khách bấm nút Hỗ trợ trong bot sẽ được chuyển tới tài khoản này.</p>
+
+          <div class="stack">
+            <div class="card">
+              <div class="card-header">
+                <h3><i class="ph ph-chat-circle-text"></i> Liên hệ hỗ trợ</h3>
+                <button class="btn btn-sm btn-primary" onclick="saveSupportContact()"><i class="ph ph-floppy-disk"></i> Lưu</button>
+              </div>
+              <div class="form-group">
+                <label>Telegram hỗ trợ</label>
+                <input type="text" id="supportUsername" placeholder="@username hoặc https://t.me/username">
+                <p class="hint">Khách bấm nút Hỗ trợ trong bot sẽ được chuyển tới tài khoản này.</p>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <h3><i class="ph ph-ticket"></i> Mã giảm giá</h3>
+              </div>
+              <div class="setting-row">
+                <div class="setting-text">
+                  <div class="setting-title">Hỏi mã giảm giá khi thanh toán</div>
+                  <p class="hint">Tắt: khách đi thẳng tới bước thanh toán, không cần bấm "Bỏ qua" (áp dụng cho mọi khách).</p>
+                </div>
+                <label class="switch" aria-label="Hỏi mã giảm giá khi thanh toán">
+                  <input type="checkbox" id="discountPromptEnabled" onchange="saveDiscountPrompt()"><span class="track"></span>
+                </label>
+              </div>
+            </div>
           </div>
         </div>
       </div>
