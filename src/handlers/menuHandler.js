@@ -1,4 +1,5 @@
 const config = require('../config');
+const { getSupportContact } = require('../utils/support');
 const db = require('../database');
 const { CALLBACKS } = require('./callbacks');
 const { t, getLang, setLang, hasLangPreference } = require('../locales');
@@ -180,7 +181,7 @@ function setupMenuHandler(bot) {
         if (text === '💬 Hỗ trợ' || text === '💬 Support') {
             const lang = getLang(userId, db.getUserLanguage);
             bot.sendMessage(chatId,
-                t('support_text', lang, { username: config.supportUsername, url: config.supportUrl }),
+                t('support_text', lang, { username: getSupportContact().username, url: getSupportContact().url }),
                 { parse_mode: 'Markdown' }
             );
             return;
@@ -335,7 +336,7 @@ function sendMainMenu(bot, chatId, editMessageId = null, userId = null) {
         ],
         [
             { text: '💱 ' + (lang === 'en' ? 'Currency' : 'Tiền tệ'), callback_data: CALLBACKS.MENU_CURRENCY },
-            { text: t('btn_support', lang), url: config.supportUrl },
+            { text: t('btn_support', lang), url: getSupportContact().url },
         ],
     ];
 

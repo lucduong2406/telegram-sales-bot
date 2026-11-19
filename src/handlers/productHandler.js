@@ -1,4 +1,5 @@
 const db = require('../database');
+const { getSupportContact } = require('../utils/support');
 const config = require('../config');
 const { formatPrice } = require('./menuHandler');
 const { CALLBACKS } = require('./callbacks');
@@ -192,7 +193,7 @@ function showProductList(bot, chatId, messageId = null, userId = null) {
 
     keyboard.push([
         { text: '🔄', callback_data: CALLBACKS.MENU_PRODUCTS_REFRESH },
-        { text: t('btn_support', lang), url: config.supportUrl },
+        { text: t('btn_support', lang), url: getSupportContact().url },
     ]);
     keyboard.push([{ text: t('btn_main_menu', lang), callback_data: CALLBACKS.MENU_MAIN }]);
 
@@ -283,7 +284,7 @@ async function showCategoryProducts(bot, chatId, messageId, categoryId, userId) 
     }
 
     keyboard.push([{ text: t('btn_back_products', lang), callback_data: CALLBACKS.MENU_PRODUCTS }]);
-    keyboard.push([{ text: t('btn_support', lang), url: config.supportUrl }]);
+    keyboard.push([{ text: t('btn_support', lang), url: getSupportContact().url }]);
 
     bot.editMessageText(text, {
         chat_id: chatId,
@@ -370,7 +371,7 @@ async function showProductDetail(bot, chatId, messageId, productId, userId = nul
     }
 
     keyboard.push([{ text: t('btn_back', lang), callback_data: backCallback || CALLBACKS.MENU_PRODUCTS }]);
-    keyboard.push([{ text: t('btn_support', lang), url: config.supportUrl }]);
+    keyboard.push([{ text: t('btn_support', lang), url: getSupportContact().url }]);
 
     bot.editMessageText(text, {
         chat_id: chatId,
