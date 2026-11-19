@@ -1,4 +1,14 @@
 const config = require('../config');
+
+/**
+ * Support contact — configurable in admin Settings (DB), falls back to SUPPORT_USERNAME env.
+ * Accepts "@name", "name" or a full t.me link.
+ */
+function getSupportContact() {
+    const raw = (db.getSetting('support_username') || config.supportUsername || '').trim();
+    const name = raw.replace(/^https?:\/\/t\.me\//i, '').replace(/^@/, '');
+    return { username: `@${name}`, url: `https://t.me/${name}` };
+}
 const { CALLBACKS } = require('./callbacks');
 const db = require('../database');
 const { t, getLang } = require('../locales');
@@ -26,7 +36,7 @@ function showHelp(bot, chatId, messageId = null, userId = null) {
 
     let text = t('help_title', lang) + '\n';
     text += t('help_contact', lang) + '\n';
-    text += t('help_telegram', lang, { username: config.supportUsername }) + '\n';
+    text += t('help_telegram', lang, { username: getSupportContact().username }) + '\n';
     text += t('help_response_time', lang) + '\n\n';
     text += `━━━━━━━━━━━━━━━━━━\n`;
     text += t('help_issues_title', lang) + '\n';
@@ -39,7 +49,7 @@ function showHelp(bot, chatId, messageId = null, userId = null) {
         parse_mode: 'Markdown',
         reply_markup: {
             inline_keyboard: [
-                [{ text: t('btn_chat_admin', lang), url: config.supportUrl }],
+                [{ text: t('btn_chat_admin', lang), url: getSupportContact().url }],
                 [{ text: t('btn_guide', lang), callback_data: CALLBACKS.SHOW_GUIDE }],
                 [{ text: t('btn_main_menu', lang), callback_data: CALLBACKS.MENU_MAIN }],
             ],
@@ -85,7 +95,7 @@ function showGuide(bot, chatId, messageId = null, userId = null) {
         parse_mode: 'Markdown',
         reply_markup: {
             inline_keyboard: [
-                [{ text: t('btn_contact_admin', lang), url: config.supportUrl }],
+                [{ text: t('btn_contact_admin', lang), url: getSupportContact().url }],
                 [{ text: t('btn_main_menu', lang), callback_data: CALLBACKS.MENU_MAIN }],
             ],
         },

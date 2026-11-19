@@ -859,6 +859,18 @@ Số Lượng Đang Hiện Có 10"
         <p class="hint" style="margin-top:8px">💡 Tra mã BIN ngân hàng tại <a
             href="https://www.vietqr.io/danh-sach-ngan-hang" target="_blank" style="color:var(--accent)">vietqr.io</a>.
           TK đang active sẽ được dùng cho đơn hàng mới.</p>
+
+        <div class="card" style="margin-top:20px">
+          <div class="card-header">
+            <h3>💬 Liên hệ hỗ trợ</h3>
+            <button class="btn btn-sm btn-primary" onclick="saveSupportContact()">💾 Lưu</button>
+          </div>
+          <div class="form-group">
+            <label>Telegram hỗ trợ (nút "Hỗ trợ" / "Chat với Admin")</label>
+            <input type="text" id="supportUsername" placeholder="@username hoặc https://t.me/username">
+            <p class="hint">Khách bấm nút Hỗ trợ trong bot sẽ được chuyển tới tài khoản này.</p>
+          </div>
+        </div>
       </div>
 
       <div class="section" id="sec-discounts">
@@ -1216,7 +1228,7 @@ Số Lượng Đang Hiện Có 10"
       if (name === 'credentials') { await populateProductSelects(); loadCredentials(); }
       if (name === 'orders') loadOrders();
       if (name === 'customers') loadCustomers();
-      if (name === 'settings') loadBankAccounts();
+      if (name === 'settings') { loadBankAccounts(); loadSupportContact(); }
       if (name === 'discounts') loadDiscounts();
       if (name === 'pricing') loadPricing();
     }
@@ -2727,6 +2739,22 @@ Số Lượng Đang Hiện Có 10"
     }
 
     // ==================== Bank Accounts ====================
+    async function loadSupportContact() {
+      try {
+        const s = await apiFetch('/settings');
+        document.getElementById('supportUsername').value = s.support_username || '';
+      } catch (err) { /* ignore */ }
+    }
+
+    async function saveSupportContact() {
+      const value = document.getElementById('supportUsername').value.trim();
+      if (!value) { alert('Vui lòng nhập username Telegram'); return; }
+      try {
+        await apiFetch('/settings', { method: 'PUT', body: { support_username: value } });
+        alert('✅ Đã lưu liên hệ hỗ trợ');
+      } catch (err) { alert('❌ ' + err.message); }
+    }
+
     async function loadBankAccounts() {
       try {
         const accounts = await apiFetch('/bank-accounts');
