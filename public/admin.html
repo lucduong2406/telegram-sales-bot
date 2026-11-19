@@ -717,6 +717,10 @@
             <input type="text" id="categoryEmoji" value="📦" maxlength="4" style="max-width:80px;text-align:center;font-size:20px">
           </div>
           <div class="form-group">
+            <label>Custom emoji ID (logo, cần Telegram Premium)</label>
+            <input type="text" id="categoryIconCustom" placeholder="Để trống nếu không dùng">
+          </div>
+          <div class="form-group">
             <label>Tên danh mục *</label>
             <input type="text" id="categoryName" placeholder="VD: Tài khoản Premium">
           </div>
@@ -991,6 +995,8 @@ Số Lượng Đang Hiện Có 10"
       <h3 id="productModalTitle">Thêm sản phẩm</h3>
       <input type="hidden" id="editProductId">
       <div class="form-group"><label>Tên SP</label><input id="pName" placeholder="VD: ChatGPT Plus 1 tháng"></div>
+      <div class="form-group"><label>Icon hiển thị trong bot (thay dấu ✅)</label><input id="pIcon" maxlength="8" placeholder="VD: 🤖 (để trống = ✅)"></div>
+      <div class="form-group"><label>Custom emoji ID (logo thương hiệu, cần Telegram Premium)</label><input id="pIconCustom" placeholder="VD: 5368324170671202286 — để trống nếu không dùng"></div>
       <div class="form-group"><label>Giá (VNĐ)</label><input type="number" id="pPrice" placeholder="65000"></div>
       <div class="form-group"><label>Mô tả</label><input id="pDesc" placeholder="Mô tả ngắn"></div>
       <div class="form-group"><label>Ghi chú</label><input id="pNote" placeholder="Lưu ý cho khách"></div>
@@ -1386,7 +1392,7 @@ Số Lượng Đang Hiện Có 10"
             <td><span class="badge ${active ? 'badge-success' : 'badge-muted'}">${active ? 'Active' : 'Ẩn'}</span></td>
             <td>
               <div class="toolbar" style="justify-content:flex-end">
-                <button class="btn btn-sm btn-ghost" onclick="editCategory(${c.id}, '${(c.name || '').replace(/'/g, "\\'")}', '${c.emoji || '📦'}')">
+                <button class="btn btn-sm btn-ghost" onclick="editCategory(${c.id}, '${(c.name || '').replace(/'/g, "\\'")}', '${c.emoji || '📦'}', '${c.icon_custom_emoji_id || ''}')">
                   <span class="material-symbols-rounded" style="font-size:14px">edit</span>
                 </button>
                 <button class="btn btn-sm btn-ghost" onclick="toggleCategory(${c.id}, ${active})" title="${active ? 'Ẩn danh mục' : 'Hiện danh mục'}">
@@ -1408,15 +1414,17 @@ Số Lượng Đang Hiện Có 10"
       document.getElementById('categoryEditId').value = id || '';
       document.getElementById('categoryName').value = '';
       document.getElementById('categoryEmoji').value = '📦';
+      document.getElementById('categoryIconCustom').value = '';
       document.getElementById('categoryModalTitle').textContent = id ? 'Sửa danh mục' : 'Thêm danh mục';
       document.getElementById('categoryModal').classList.add('active');
       document.getElementById('categoryName').focus();
     }
 
-    function editCategory(id, name, emoji) {
+    function editCategory(id, name, emoji, customId = '') {
       document.getElementById('categoryEditId').value = id;
       document.getElementById('categoryName').value = name;
       document.getElementById('categoryEmoji').value = emoji;
+      document.getElementById('categoryIconCustom').value = customId;
       document.getElementById('categoryModalTitle').textContent = 'Sửa danh mục';
       document.getElementById('categoryModal').classList.add('active');
       document.getElementById('categoryName').focus();
@@ -1430,13 +1438,14 @@ Số Lượng Đang Hiện Có 10"
       const id = document.getElementById('categoryEditId').value;
       const name = document.getElementById('categoryName').value.trim();
       const emoji = document.getElementById('categoryEmoji').value.trim() || '📦';
+      const icon = document.getElementById('categoryIconCustom').value.trim();
       if (!name) { toast('Tên danh mục không được để trống', 'error'); return; }
       try {
         if (id) {
-          await apiFetch(`/categories/${id}`, 'PUT', { name, emoji });
+          await apiFetch(`/categories/${id}`, { method: 'PUT', body: { name, emoji, icon_custom_emoji_id: icon } });
           toast('Đã cập nhật danh mục');
         } else {
-          await apiFetch('/categories', 'POST', { name, emoji });
+          await apiFetch('/categories', { method: 'POST', body: { name, emoji, icon_custom_emoji_id: icon } });
           toast('Đã thêm danh mục');
         }
         closeCategoryModal();
@@ -1446,7 +1455,7 @@ Số Lượng Đang Hiện Có 10"
 
     async function toggleCategory(id, currentActive) {
       try {
-        await apiFetch(`/categories/${id}`, 'PUT', { is_active: currentActive ? false : true });
+        await apiFetch(`/categories/${id}`, { method: 'PUT', body: { is_active: !currentActive } });
         toast(currentActive ? 'Đã ẩn danh mục' : 'Đã hiện danh mục');
         loadCategories();
       } catch (e) { toast(e.message, 'error'); }
@@ -1455,7 +1464,7 @@ Số Lượng Đang Hiện Có 10"
     async function deleteCategory(id, name) {
       if (!confirm(`Xóa danh mục "${name}"?\nCác SP thuộc danh mục sẽ chuyển về Không phân loại.`)) return;
       try {
-        await apiFetch(`/categories/${id}`, 'DELETE');
+        await apiFetch(`/categories/${id}`, { method: 'DELETE' });
         toast('Đã xóa danh mục');
         loadCategories();
       } catch (e) { toast(e.message, 'error'); }
@@ -1648,6 +1657,8 @@ Số Lượng Đang Hiện Có 10"
       document.getElementById('productModalTitle').textContent = product ? 'Sửa sản phẩm' : 'Thêm sản phẩm';
       document.getElementById('editProductId').value = product ? product.id : '';
       document.getElementById('pName').value = product ? product.name : '';
+      document.getElementById('pIcon').value = product ? (product.icon || '') : '';
+      document.getElementById('pIconCustom').value = product ? (product.icon_custom_emoji_id || '') : '';
       document.getElementById('pPrice').value = product ? product.price : '';
       document.getElementById('pDesc').value = product ? (product.description || '') : '';
       document.getElementById('pNote').value = product ? (product.note || '') : '';
@@ -1739,6 +1750,8 @@ Số Lượng Đang Hiện Có 10"
       const credentialFields = getFieldsFromBuilder();
       const body = {
         name: document.getElementById('pName').value,
+        icon: document.getElementById('pIcon').value,
+        iconCustomEmojiId: document.getElementById('pIconCustom').value,
         price: document.getElementById('pPrice').value,
         description: document.getElementById('pDesc').value,
         note: document.getElementById('pNote').value,

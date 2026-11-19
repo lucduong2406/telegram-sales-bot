@@ -262,6 +262,9 @@ async function initDatabase() {
         `ALTER TABLE products ADD COLUMN sort_order INTEGER DEFAULT 0`,
         `ALTER TABLE products ADD COLUMN preorder_stock INTEGER DEFAULT 0`,
         `ALTER TABLE products ADD COLUMN max_per_user INTEGER DEFAULT 0`,
+        `ALTER TABLE products ADD COLUMN icon TEXT`,
+        `ALTER TABLE products ADD COLUMN icon_custom_emoji_id TEXT`,
+        `ALTER TABLE categories ADD COLUMN icon_custom_emoji_id TEXT`,
         `ALTER TABLE orders ADD COLUMN discount_code TEXT`,
         `ALTER TABLE orders ADD COLUMN discount_amount INTEGER DEFAULT 0`,
         `ALTER TABLE discount_codes ADD COLUMN max_discount_qty INTEGER DEFAULT 0`,
@@ -385,6 +388,7 @@ function updateCategory(id, updates) {
     const values = [];
     if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name); }
     if (updates.emoji !== undefined) { fields.push('emoji = ?'); values.push(updates.emoji); }
+    if (updates.icon_custom_emoji_id !== undefined) { fields.push('icon_custom_emoji_id = ?'); values.push(updates.icon_custom_emoji_id); }
     if (updates.sort_order !== undefined) { fields.push('sort_order = ?'); values.push(updates.sort_order); }
     if (updates.is_active !== undefined) { fields.push('is_active = ?'); values.push(updates.is_active); }
     if (fields.length === 0) return;
@@ -798,7 +802,7 @@ function getAllProductsStock() {
     const stmt = db.prepare(`
     SELECT p.id, p.name, p.price, p.description, p.note, p.credential_fields, p.is_active, p.is_hidden,
            p.product_type, p.invite_slots, p.delivery_hours, p.subscription_days, p.customer_fields,
-           p.preorder_stock, p.cost_price, p.seller_name, p.seller_telegram, p.seller_phone, p.seller_email, p.seller_note,
+           p.preorder_stock, p.cost_price, p.icon, p.icon_custom_emoji_id, p.seller_name, p.seller_telegram, p.seller_phone, p.seller_email, p.seller_note,
            CASE p.product_type
              WHEN 'invite' THEN MAX(0, COALESCE(p.invite_slots, 0) - (SELECT COALESCE(SUM(quantity), 0) FROM orders WHERE product_id = p.id AND status IN ('paid','delivered')))
              WHEN 'preorder' THEN MAX(0, COALESCE(p.preorder_stock, 0) - (SELECT COALESCE(SUM(quantity), 0) FROM orders WHERE product_id = p.id AND status IN ('paid','delivered')))

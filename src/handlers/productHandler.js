@@ -5,6 +5,7 @@ const { formatPrice } = require('./menuHandler');
 const { CALLBACKS } = require('./callbacks');
 const { t, getLang } = require('../locales');
 const { formatProductPrice } = require('./currencyHandler');
+const { withIcon, withIconFallback } = require('../utils/customEmoji');
 
 /**
  * Handle product listing with categories and featured products
@@ -13,6 +14,14 @@ function setupProductHandler(bot) {
     // /products text command
     bot.onText(/\/products/, (msg) => {
         showProductList(bot, msg.chat.id, null, msg.from.id);
+    });
+
+    // Admin helper: send a message containing custom emoji -> bot replies with their IDs
+    bot.on('message', (msg) => {
+        if (msg.from.id !== config.adminTelegramId || !msg.entities) return;
+        const ids = msg.entities.filter(e => e.type === 'custom_emoji').map(e => e.custom_emoji_id);
+        if (ids.length === 0) return;
+        bot.sendMessage(msg.chat.id, '🆔 Custom emoji ID:\n' + ids.map(i => `\`${i}\``).join('\n'), { parse_mode: 'Markdown' }).catch(() => {});
     });
 
     // Callback handlers
@@ -129,12 +138,12 @@ function showProductList(bot, chatId, messageId = null, userId = null) {
     if (visibleFeatured.length > 0) {
         text += t('product_hot', lang) + '\n\n';
         for (const p of visibleFeatured) {
-            const icon = p.stock > 0 ? '🌟' : '❌';
+            const icon = p.stock > 0 ? (p.icon || '🌟') : '❌';
             const priceText = formatProductPrice(p, userCurrency);
-            keyboard.push([{
+            keyboard.push([withIcon({
                 text: `${icon} ${p.name} — ${priceText}`,
                 callback_data: `product_${p.id}_featured`,
-            }]);
+            }, p.icon_custom_emoji_id)]);
         }
     }
 
@@ -153,10 +162,10 @@ function showProductList(bot, chatId, messageId = null, userId = null) {
         for (const cat of categories) {
             const count = catCounts[cat.id] || 0;
             if (count === 0) continue;
-            catRow.push({
+            catRow.push(withIcon({
                 text: `${cat.emoji} ${cat.name} (${count})`,
                 callback_data: `cat_${cat.id}`,
-            });
+            }, cat.icon_custom_emoji_id));
             if (catRow.length === 2) {
                 keyboard.push([...catRow]);
                 catRow.length = 0;
@@ -173,12 +182,12 @@ function showProductList(bot, chatId, messageId = null, userId = null) {
             text += '\n' + t('product_other', lang) + '\n';
         }
         for (const p of uncategorized) {
-            const icon = p.stock > 0 ? '✅' : '❌';
+            const icon = p.stock > 0 ? (p.icon || '✅') : '❌';
             const priceText = formatProductPrice(p, userCurrency);
-            keyboard.push([{
+            keyboard.push([withIcon({
                 text: `${icon} ${p.name} — ${priceText}`,
                 callback_data: `product_${p.id}`,
-            }]);
+            }, p.icon_custom_emoji_id)]);
         }
     }
 
@@ -203,6 +212,13 @@ function showProductList(bot, chatId, messageId = null, userId = null) {
     };
 
     console.log(`[DEBUG showProductList] Sending message, messageId=${messageId}, textLength=${text.length}`);
+    const sendList = (markup) => messageId
+        ? bot.editMessageText(text, { chat_id: chatId, message_id: messageId, ...options, reply_markup: markup })
+        : bot.sendMessage(chatId, text, { ...options, reply_markup: markup });
+    if (options.reply_markup.inline_keyboard.some(r => r.some(b => b.icon_custom_emoji_id))) {
+        withIconFallback(options.reply_markup, sendList).catch(ignoreNotModified);
+        return;
+    }
     if (messageId) {
         bot.editMessageText(text, { chat_id: chatId, message_id: messageId, ...options }).catch(err => {
             console.error('[Product] editMessage failed:', err.message);
@@ -262,7 +278,7 @@ async function showCategoryProducts(bot, chatId, messageId, categoryId, userId) 
     text += '━━━━━━━━━━━━━━━━━━\n\n';
 
     for (const p of products) {
-        const icon = p.stock > 0 ? '✅' : '❌';
+        const icon = p.stock > 0 ? (p.icon || '✅') : '❌';
         const priceText = formatProductPrice(p, userCurrency);
         text += `${icon} **${p.name}** — ${priceText}`;
         if (p.stock > 0) {
@@ -275,23 +291,23 @@ async function showCategoryProducts(bot, chatId, messageId, categoryId, userId) 
 
     const keyboard = [];
     for (const p of products) {
-        const icon = p.stock > 0 ? '🛒' : '❌';
+        const icon = p.stock > 0 ? (p.icon || '🛒') : '❌';
         const priceText = formatProductPrice(p, userCurrency);
-        keyboard.push([{
+        keyboard.push([withIcon({
             text: `${icon} ${p.name} — ${priceText}`,
             callback_data: `product_${p.id}_cat${categoryId}`,
-        }]);
+        }, p.icon_custom_emoji_id)]);
     }
 
     keyboard.push([{ text: t('btn_back_products', lang), callback_data: CALLBACKS.MENU_PRODUCTS }]);
     keyboard.push([{ text: t('btn_support', lang), url: getSupportContact().url }]);
 
-    bot.editMessageText(text, {
+    withIconFallback({ inline_keyboard: keyboard }, (markup) => bot.editMessageText(text, {
         chat_id: chatId,
         message_id: messageId,
         parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: keyboard },
-    }).catch(ignoreNotModified);
+        reply_markup: markup,
+    })).catch(ignoreNotModified);
 }
 
 /**

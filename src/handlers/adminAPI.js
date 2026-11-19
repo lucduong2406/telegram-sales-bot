@@ -2,6 +2,12 @@ const db = require('../database');
 const config = require('../config');
 const { deliverCredentials } = require('./deliveryHandler');
 
+/** Telegram custom emoji IDs are numeric strings */
+function cleanEmojiId(v) {
+    const s = String(v || '').trim();
+    return /^\d{5,30}$/.test(s) ? s : null;
+}
+
 /**
  * Setup REST API routes for web admin panel
  * All routes prefixed with /api/admin
@@ -97,6 +103,7 @@ function setupAdminAPI(app, bot) {
                 return res.status(400).json({ error: true, message: 'Tên danh mục không được để trống', code: 'VALIDATION_ERROR' });
             }
             const id = db.addCategory(name.trim(), emoji || '📦');
+            if (req.body.icon_custom_emoji_id) db.updateCategory(id, { icon_custom_emoji_id: cleanEmojiId(req.body.icon_custom_emoji_id) });
             res.json({ id, message: 'Danh mục đã tạo' });
         } catch (err) {
             res.status(500).json({ error: true, message: err.message, code: 'INTERNAL_ERROR' });
@@ -122,6 +129,7 @@ function setupAdminAPI(app, bot) {
             const updates = {};
             if (name !== undefined) updates.name = name.trim();
             if (emoji !== undefined) updates.emoji = emoji;
+            if (req.body.icon_custom_emoji_id !== undefined) updates.icon_custom_emoji_id = cleanEmojiId(req.body.icon_custom_emoji_id);
             if (is_active !== undefined) updates.is_active = is_active ? 1 : 0;
             db.updateCategory(parseInt(req.params.id), updates);
             res.json({ message: 'Danh mục đã cập nhật' });
@@ -198,6 +206,12 @@ function setupAdminAPI(app, bot) {
             if (req.body.isFeatured !== undefined) {
                 db.updateProduct(id, { is_featured: req.body.isFeatured ? 1 : 0 });
             }
+            if (req.body.icon) {
+                db.updateProduct(id, { icon: String(req.body.icon).trim().slice(0, 8) });
+            }
+            if (req.body.iconCustomEmojiId) {
+                db.updateProduct(id, { icon_custom_emoji_id: cleanEmojiId(req.body.iconCustomEmojiId) });
+            }
             if (req.body.isHidden !== undefined) {
                 db.updateProduct(id, { is_hidden: req.body.isHidden ? 1 : 0 });
             }
@@ -229,6 +243,8 @@ function setupAdminAPI(app, bot) {
             if (req.body.categoryId !== undefined) updates.category_id = req.body.categoryId || null;
             if (req.body.warrantyDays !== undefined) updates.warranty_days = req.body.warrantyDays ? parseInt(req.body.warrantyDays) : null;
             // Seller info + cost price
+            if (req.body.iconCustomEmojiId !== undefined) updates.icon_custom_emoji_id = cleanEmojiId(req.body.iconCustomEmojiId);
+            if (req.body.icon !== undefined) updates.icon = (req.body.icon || '').trim().slice(0, 8) || null;
             if (req.body.costPrice !== undefined) updates.cost_price = parseInt(req.body.costPrice) || 0;
             if (req.body.sellerName !== undefined) updates.seller_name = req.body.sellerName || null;
             if (req.body.sellerTelegram !== undefined) updates.seller_telegram = req.body.sellerTelegram || null;
