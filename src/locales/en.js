@@ -147,6 +147,16 @@ module.exports = {
   paypal_note: 'After payment, return here to receive your product.',
   btn_pay_paypal: '🔗 Pay with PayPal',
 
+  // ── GPM Pay Payment ──
+  btn_gpmpay: '🏦 Bank Transfer (GPM Pay)',
+  gpmpay_title: '🏦 **GPM Pay Payment**\n',
+  gpmpay_bank: '• Bank: **{bank}**',
+  gpmpay_account: '• Account: **{account}**',
+  gpmpay_owner: '• Account holder: **{name}**',
+  gpmpay_content: '• Transfer note: **{code}**',
+  gpmpay_qr: '👇 Scan QR code below to pay:',
+  gpmpay_note: '📝 Please write the exact transfer note shown on the QR.',
+
   // ── Order Status & Cancel ──
   order_cancelled: '✅ Order **#{code}** has been cancelled.',
   order_cancel_fail: '❌ Cannot cancel (order already paid or expired).',

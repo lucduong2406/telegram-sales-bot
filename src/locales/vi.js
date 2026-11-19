@@ -147,6 +147,16 @@ module.exports = {
   paypal_note: 'Sau khi thanh toán xong, quay lại đây để nhận sản phẩm.',
   btn_pay_paypal: '🔗 Thanh toán qua PayPal',
 
+  // ── GPM Pay Payment ──
+  btn_gpmpay: '🏦 Chuyển khoản (GPM Pay)',
+  gpmpay_title: '🏦 **Thanh toán GPM Pay**\n',
+  gpmpay_bank: '• Ngân hàng: **{bank}**',
+  gpmpay_account: '• Số tài khoản: **{account}**',
+  gpmpay_owner: '• Chủ TK: **{name}**',
+  gpmpay_content: '• Nội dung CK: **{code}**',
+  gpmpay_qr: '👇 Quét mã QR bên dưới để thanh toán:',
+  gpmpay_note: '📝 Vui lòng ghi đúng nội dung chuyển khoản như hiển thị trên QR.',
+
   // ── Order Status & Cancel ──
   order_cancelled: '✅ Đơn **#{code}** đã được hủy.',
   order_cancel_fail: '❌ Không thể hủy đơn (đơn đã thanh toán hoặc hết hạn).',

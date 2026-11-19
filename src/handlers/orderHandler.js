@@ -1,6 +1,7 @@
 const db = require('../database');
 const config = require('../config');
 const { generateQRUrl } = require('../utils/vietqr');
+const { buildGpmPayQrUrl } = require('../utils/gpmpay');
 const { formatPrice } = require('./menuHandler');
 const { CALLBACKS } = require('./callbacks');
 const { t, getLang } = require('../locales');
@@ -34,7 +35,7 @@ function setupOrderHandler(bot) {
         const data = query.data;
 
         // Payment method selection callbacks
-        if (data === CALLBACKS.PAY_VIETQR || data === CALLBACKS.PAY_USDT || data === CALLBACKS.PAY_PAYPAL) {
+        if (data === CALLBACKS.PAY_VIETQR || data === CALLBACKS.PAY_USDT || data === CALLBACKS.PAY_PAYPAL || data === CALLBACKS.PAY_GPMPAY) {
             bot.answerCallbackQuery(query.id);
             // Payment method is handled in event flow, not here
             return;
@@ -81,7 +82,7 @@ function showPaymentMethodSelection(bot, orderData) {
 
     let text = t('payment_select', lang, { total: formatPrice(totalAmount) });
     if (preferredMethod) {
-        const methodLabels = { vietqr: 'VietQR (VND)', usdt: 'USDT', paypal: 'PayPal (USD)' };
+        const methodLabels = { vietqr: 'VietQR (VND)', usdt: 'USDT', paypal: 'PayPal (USD)', gpmpay: 'GPM Pay (VND)' };
         text += `\n\n⭐ ${lang === 'en' ? 'Default' : 'Mặc định'}: ${methodLabels[preferredMethod] || preferredMethod}`;
     }
 
@@ -107,6 +108,10 @@ function showPaymentMethodSelection(bot, orderData) {
             callbackData = CALLBACKS.PAY_PAYPAL;
             const usdAmount = (totalAmount / usdRate).toFixed(2);
             label = `${star}💳 USD — $${usdAmount} (PayPal)`;
+        } else if (method.id === 'gpmpay') {
+            callbackData = CALLBACKS.PAY_GPMPAY;
+            const vndFormatted = Math.round(totalAmount).toLocaleString('vi-VN');
+            label = `${star}🏦 GPM Pay — ${vndFormatted} đ`;
         }
         keyboard.push([{ text: label, callback_data: callbackData }]);
     }
@@ -127,6 +132,7 @@ function showPaymentMethodSelection(bot, orderData) {
         if (data === CALLBACKS.PAY_VIETQR) selectedMethod = 'vietqr';
         else if (data === CALLBACKS.PAY_USDT) selectedMethod = 'usdt';
         else if (data === CALLBACKS.PAY_PAYPAL) selectedMethod = 'paypal';
+        else if (data === CALLBACKS.PAY_GPMPAY) selectedMethod = 'gpmpay';
 
         if (selectedMethod) {
             bot.removeListener('callback_query', handler);
@@ -139,7 +145,7 @@ function showPaymentMethodSelection(bot, orderData) {
             db.setPreferredPaymentMethod(userId, selectedMethod);
 
             if (isFirstTime) {
-                const methodLabels = { vietqr: 'VietQR (VND)', usdt: 'USDT', paypal: 'PayPal (USD)' };
+                const methodLabels = { vietqr: 'VietQR (VND)', usdt: 'USDT', paypal: 'PayPal (USD)', gpmpay: 'GPM Pay (VND)' };
                 const notifyMsg = lang === 'en'
                     ? `⭐ *${methodLabels[selectedMethod]}* is now your default payment method.\nChange anytime via /paymentmethod`
                     : `⭐ *${methodLabels[selectedMethod]}* đã được lưu làm phương thức thanh toán mặc định.\nThay đổi bất kỳ lúc nào qua /paymentmethod`;
@@ -149,6 +155,7 @@ function showPaymentMethodSelection(bot, orderData) {
             if (selectedMethod === 'vietqr') createOrder(bot, orderData);
             else if (selectedMethod === 'usdt') createOrderUsdt(bot, orderData);
             else if (selectedMethod === 'paypal') createOrderPaypal(bot, orderData);
+            else if (selectedMethod === 'gpmpay') createOrderGpmPay(bot, orderData);
         }
     };
     bot.on('callback_query', handler);
@@ -511,6 +518,237 @@ async function createOrderPaypal(bot, data) {
         });
     } catch (err) {
         console.error('Error creating PayPal order:', err.message);
+        bot.sendMessage(chatId, t('order_create_error', lang));
+    }
+}
+
+/**
+ * Create a GPM Pay order and show VietQR code
+ * GPM Pay: customer transfers to merchant's bank account, webhook matches by order code in content
+ */
+async function createOrderGpmPay(bot, data) {
+    const { chatId, messageId, userId, username, productId, quantity, customerEmail,
+        discountCode, discountAmount, items, paymentMethod } = data;
+    const lang = getLang(userId, db.getUserLanguage);
+
+    try {
+        // Handle multi-item (cart) or single-item order
+        if (items && items.length > 0) {
+            return createGpmPayMultiItemOrder(bot, data);
+        }
+
+        const product = db.getProductById(productId);
+
+        if (!product) {
+            bot.sendMessage(chatId, t('order_product_not_found', lang));
+            return;
+        }
+
+        if (product.stock < quantity) {
+            bot.sendMessage(chatId, t('order_insufficient_stock', lang, {
+                name: product.name,
+                requested: quantity,
+                available: product.stock,
+            }));
+            return;
+        }
+
+        // Check max per user limit
+        if (product.max_per_user && product.max_per_user > 0) {
+            const purchased = db.getUserProductPurchaseCount(userId, productId);
+            const remaining = product.max_per_user - purchased;
+            if (remaining <= 0) {
+                bot.sendMessage(chatId, t('max_purchase', lang, { n: product.max_per_user }));
+                return;
+            }
+            if (quantity > remaining) {
+                bot.sendMessage(chatId, t('max_purchase_remaining', lang, { n: remaining }));
+                return;
+            }
+        }
+
+        const originalAmount = product.price * quantity;
+        const finalDiscountAmount = discountAmount || 0;
+        const totalAmount = originalAmount - finalDiscountAmount;
+        const expiresAt = new Date(Date.now() + config.orderExpiryMinutes * 60 * 1000).toISOString();
+
+        const orderCode = db.createOrder({
+            telegramUserId: userId,
+            telegramUsername: username,
+            productId: product.id,
+            productName: product.name,
+            quantity,
+            unitPrice: product.price,
+            totalAmount,
+            qrUrl: '',
+            expiresAt,
+            customerEmail: customerEmail || null,
+            discountCode: discountCode || null,
+            discountAmount: finalDiscountAmount,
+        });
+
+        // Also create order_items entry for consistency
+        try {
+            const orderResult = db.getDb().exec('SELECT id FROM orders WHERE order_code = ?', [orderCode]);
+            if (orderResult.length > 0) {
+                const orderId = orderResult[0].values[0][0];
+                db.getDb().run(
+                    `INSERT INTO order_items (order_id, product_id, product_name, quantity, unit_price, subtotal)
+                     VALUES (?, ?, ?, ?, ?, ?)`,
+                    [orderId, product.id, product.name, quantity, product.price, originalAmount]
+                );
+                db.saveDatabase();
+            }
+        } catch (e) { /* ignore if fails */ }
+
+        // Clear cart after successful order
+        db.clearCart(userId);
+
+        // Mark payment method as GPM Pay (createOrder defaults to 'vietqr')
+        db.getDb().run('UPDATE orders SET payment_method = ? WHERE order_code = ?', ['gpmpay', orderCode]);
+        db.saveDatabase();
+
+        const qrUrl = buildGpmPayQrUrl(totalAmount, orderCode);
+        const minutesLeft = Math.ceil((new Date(expiresAt) - Date.now()) / 60000);
+        const bank = db.getBankConfig();
+
+        let text = t('order_title', lang, { code: orderCode }) + '\n';
+        text += t('order_product', lang, { name: product.name }) + '\n';
+        text += t('order_qty', lang, { qty: quantity }) + '\n';
+
+        if (finalDiscountAmount > 0) {
+            text += t('order_original_price', lang, { amount: formatPrice(originalAmount) }) + '\n';
+            text += t('order_discount_line', lang, { code: discountCode, amount: formatPrice(finalDiscountAmount) }) + '\n';
+            text += t('order_total', lang, { amount: formatPrice(totalAmount) }) + '\n';
+        } else {
+            text += t('order_total_no_discount', lang, { amount: formatPrice(totalAmount) }) + '\n';
+        }
+        if (customerEmail) {
+            text += t('order_email', lang, { email: customerEmail }) + '\n';
+        }
+        if (['invite', 'preorder'].includes(product.product_type) && product.delivery_hours > 0) {
+            text += t('order_sla', lang, { hours: product.delivery_hours }) + '\n';
+        }
+        text += '\n' + t('order_expires', lang, { minutes: minutesLeft }) + '\n\n';
+        text += t('gpmpay_title') + '\n';
+        text += t('gpmpay_bank', { bank: bank.name }) + '\n';
+        text += t('gpmpay_account', { account: bank.accountNo }) + '\n';
+        text += t('gpmpay_owner', { name: bank.accountName }) + '\n';
+        text += t('gpmpay_content', { code: orderCode }) + '\n';
+        text += t('gpmpay_note') + '\n\n';
+        text += t('gpmpay_qr');
+
+        const keyboard = [
+            [{ text: t('btn_cancel_order', lang), callback_data: `${CALLBACKS.CANCEL_ORDER_PREFIX}${orderCode}` }],
+            [{ text: t('btn_main_menu', lang), callback_data: CALLBACKS.MENU_MAIN }],
+        ];
+
+        try {
+            await bot.sendPhoto(chatId, qrUrl, {
+                caption: text,
+                parse_mode: 'Markdown',
+                reply_markup: { inline_keyboard: keyboard },
+            });
+        } catch (err) {
+            console.error('Error sending GPM Pay QR image:', err.message);
+            bot.sendMessage(chatId, text + `\n\n🔗 QR Code: ${qrUrl}`, {
+                parse_mode: 'Markdown',
+                reply_markup: { inline_keyboard: keyboard },
+            });
+        }
+
+        // Auto-confirm reminder
+        bot.sendMessage(chatId, t('order_auto_confirm', lang));
+    } catch (err) {
+        console.error('Error creating GPM Pay order:', err.message);
+        bot.sendMessage(chatId, t('order_create_error', lang));
+    }
+}
+
+/**
+ * Create a multi-item GPM Pay order from cart
+ */
+async function createGpmPayMultiItemOrder(bot, data) {
+    const { chatId, userId, username, customerEmail, discountCode, discountAmount, items, paymentMethod } = data;
+    const lang = getLang(userId, db.getUserLanguage);
+
+    try {
+        const originalAmount = items.reduce((sum, i) => sum + i.subtotal, 0);
+        const finalDiscountAmount = discountAmount || 0;
+        const totalAmount = originalAmount - finalDiscountAmount;
+        const expiresAt = new Date(Date.now() + config.orderExpiryMinutes * 60 * 1000).toISOString();
+
+        const orderCode = db.createOrderWithItems({
+            telegramUserId: userId,
+            telegramUsername: username,
+            totalAmount,
+            expiresAt,
+            customerEmail: customerEmail || null,
+            discountCode: discountCode || null,
+            discountAmount: finalDiscountAmount,
+            paymentMethod: 'gpmpay',
+        }, items);
+
+        // Clear cart after successful order
+        db.clearCart(userId);
+
+        const qrUrl = buildGpmPayQrUrl(totalAmount, orderCode);
+        const minutesLeft = Math.ceil((new Date(expiresAt) - Date.now()) / 60000);
+        const bank = db.getBankConfig();
+
+        let text = t('order_title', lang, { code: orderCode }) + '\n';
+        text += t('order_items_header', lang) + '\n';
+
+        for (const item of items) {
+            text += t('order_item_line', lang, {
+                name: item.productName,
+                qty: item.quantity,
+                price: formatPrice(item.subtotal),
+            }) + '\n';
+        }
+
+        if (finalDiscountAmount > 0) {
+            text += '\n' + t('order_original_price', lang, { amount: formatPrice(originalAmount) }) + '\n';
+            text += t('order_discount_line', lang, { code: discountCode, amount: formatPrice(finalDiscountAmount) }) + '\n';
+            text += t('order_total', lang, { amount: formatPrice(totalAmount) }) + '\n';
+        } else {
+            text += '\n' + t('order_total_no_discount', lang, { amount: formatPrice(totalAmount) }) + '\n';
+        }
+        if (customerEmail) {
+            text += t('order_email', lang, { email: customerEmail }) + '\n';
+        }
+        text += '\n' + t('order_expires', lang, { minutes: minutesLeft }) + '\n\n';
+        text += t('gpmpay_title') + '\n';
+        text += t('gpmpay_bank', { bank: bank.name }) + '\n';
+        text += t('gpmpay_account', { account: bank.accountNo }) + '\n';
+        text += t('gpmpay_owner', { name: bank.accountName }) + '\n';
+        text += t('gpmpay_content', { code: orderCode }) + '\n';
+        text += t('gpmpay_note') + '\n\n';
+        text += t('gpmpay_qr');
+
+        const keyboard = [
+            [{ text: t('btn_cancel_order', lang), callback_data: `${CALLBACKS.CANCEL_ORDER_PREFIX}${orderCode}` }],
+            [{ text: t('btn_main_menu', lang), callback_data: CALLBACKS.MENU_MAIN }],
+        ];
+
+        try {
+            await bot.sendPhoto(chatId, qrUrl, {
+                caption: text,
+                parse_mode: 'Markdown',
+                reply_markup: { inline_keyboard: keyboard },
+            });
+        } catch (err) {
+            console.error('Error sending GPM Pay QR image:', err.message);
+            bot.sendMessage(chatId, text + `\n\n🔗 QR Code: ${qrUrl}`, {
+                parse_mode: 'Markdown',
+                reply_markup: { inline_keyboard: keyboard },
+            });
+        }
+
+        // Auto-confirm reminder
+        bot.sendMessage(chatId, t('order_auto_confirm', lang));
+    } catch (err) {
+        console.error('Error creating multi-item GPM Pay order:', err.message);
         bot.sendMessage(chatId, t('order_create_error', lang));
     }
 }

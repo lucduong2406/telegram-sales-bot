@@ -49,6 +49,7 @@ const CALLBACKS = {
     PAY_VIETQR: 'pay_vietqr',
     PAY_USDT: 'pay_usdt',
     PAY_PAYPAL: 'pay_paypal',
+    PAY_GPMPAY: 'pay_gpmpay',
 
     // Currency (F-11)
     CURRENCY_PREFIX: 'currency_',

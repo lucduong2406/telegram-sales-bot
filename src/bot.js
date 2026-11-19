@@ -24,6 +24,7 @@ const { startOrderExpiryCheck } = require('./utils/orderExpiry');
 const { startSepayPoller } = require('./utils/sepayPoller');
 const { setupScheduler } = require('./scheduler');
 const { setupCheckerAPI } = require('./handlers/checkerAPI');
+const { setupGpmPayWebhookHandler } = require('./handlers/gpmpayWebhookHandler');
 
 async function main() {
     console.log('🚀 Starting Telegram Sales Bot v2.0...');
@@ -65,6 +66,11 @@ async function main() {
 
     // 6. Setup Express server
     const app = express();
+
+    // GPM Pay webhook — raw body parser MUST come before express.json()
+    // so constructWebhookEvent() receives the original bytes for HMAC verification
+    setupGpmPayWebhookHandler(app, bot);
+
     app.use(express.json());
 
     // Health check

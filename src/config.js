@@ -61,6 +61,11 @@ const config = {
   // Support (configurable per instance)
   supportUsername: process.env.SUPPORT_USERNAME || '@maingocanh',
   supportUrl: `https://t.me/${(process.env.SUPPORT_USERNAME || '@maingocanh').replace('@', '')}`,
+
+  // GPM Pay
+  gpmpayApiToken: process.env.GPMPAY_API_TOKEN,
+  gpmpayApiUrl: process.env.GPMPAY_API_URL || 'https://api.gpmpay.com/api/v1',
+  gpmpayWebhookSecret: process.env.GPMPAY_WEBHOOK_SECRET,
 };
 
 // Startup validation

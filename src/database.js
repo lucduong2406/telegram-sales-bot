@@ -214,6 +214,16 @@ async function initDatabase() {
     )
   `);
 
+    // Processed GPM Pay transactions (idempotency — store event.payload.id)
+    db.run(`
+    CREATE TABLE IF NOT EXISTS processed_transactions (
+      id TEXT PRIMARY KEY,
+      order_code TEXT,
+      amount INTEGER,
+      processed_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
     // Product prices (multi-currency manual pricing)
     db.run(`
     CREATE TABLE IF NOT EXISTS product_prices (
@@ -724,6 +734,25 @@ function updateOrderStatus(orderCode, status) {
     values.push(orderCode);
 
     db.run(sql, values);
+    saveDatabase();
+}
+
+/**
+ * Check if a GPM Pay transaction has already been processed (idempotency)
+ */
+function isTransactionProcessed(transactionId) {
+    const result = db.exec('SELECT 1 FROM processed_transactions WHERE id = ?', [transactionId]);
+    return result.length > 0 && result[0].values.length > 0;
+}
+
+/**
+ * Mark a GPM Pay transaction as processed
+ */
+function markTransactionProcessed(transactionId, orderCode, amount) {
+    db.run(
+        'INSERT OR IGNORE INTO processed_transactions (id, order_code, amount) VALUES (?, ?, ?)',
+        [transactionId, orderCode, amount]
+    );
     saveDatabase();
 }
 
@@ -1426,6 +1455,8 @@ module.exports = {
     isNewUser,
     updateOrderStatus,
     getExpiredOrders,
+    isTransactionProcessed,
+    markTransactionProcessed,
     getRecentOrders,
     getExpiringSubscriptions,
     markExpiryReminded,
@@ -2129,6 +2160,7 @@ function updateOrderItemStatus(orderItemId, status) {
 // ==================== Payment Methods ====================
 
 function getEnabledPaymentMethods() {
+    const config = require('./config');
     const methods = [];
 
     // VietQR — available if bank is configured
@@ -2147,6 +2179,11 @@ function getEnabledPaymentMethods() {
     const paypalEmail = getSetting('paypal_email');
     if (paypalEmail) {
         methods.push({ id: 'paypal', label: 'PayPal', icon: '💳' });
+    }
+
+    // GPM Pay — available if API token is configured
+    if (config.gpmpayApiToken) {
+        methods.push({ id: 'gpmpay', label: 'GPM Pay', icon: '🏦' });
     }
 
     return methods;
