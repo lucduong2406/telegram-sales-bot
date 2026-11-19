@@ -655,6 +655,7 @@ async function createOrderGpmPay(bot, data) {
             const qrPng = await buildGpmPayQrPng(totalAmount, orderCode);
             await bot.sendPhoto(chatId, qrPng, {
                 caption: text,
+                show_caption_above_media: true,
                 parse_mode: 'Markdown',
                 reply_markup: { inline_keyboard: keyboard },
             }, { filename: 'qr.png', contentType: 'image/png' });
@@ -744,6 +745,7 @@ async function createGpmPayMultiItemOrder(bot, data) {
             const qrPng = await buildGpmPayQrPng(totalAmount, orderCode);
             await bot.sendPhoto(chatId, qrPng, {
                 caption: text,
+                show_caption_above_media: true,
                 parse_mode: 'Markdown',
                 reply_markup: { inline_keyboard: keyboard },
             }, { filename: 'qr.png', contentType: 'image/png' });
