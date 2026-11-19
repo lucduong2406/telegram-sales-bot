@@ -4,7 +4,7 @@ const path = require('path');
 
 const BIN_DIR = path.join(__dirname, '..', '..', 'bin');
 const URL_RE = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/i;
-const START_TIMEOUT_MS = 30000;
+const START_TIMEOUT_MS = 45000;
 
 const state = {
     proc: null,
@@ -59,25 +59,43 @@ async function ensureBinary() {
 
 function spawnTunnel(bin, port) {
     return new Promise((resolve, reject) => {
-        const proc = spawn(bin, ['tunnel', '--no-autoupdate', '--url', `http://127.0.0.1:${port}`], {
+        // http2 (TCP) works on networks/LXC where QUIC (UDP) is blocked or throttled
+        const proc = spawn(bin, ['tunnel', '--no-autoupdate', '--protocol', 'http2', '--url', `http://127.0.0.1:${port}`], {
             stdio: ['ignore', 'pipe', 'pipe'],
         });
         state.proc = proc;
         let settled = false;
         let buf = '';
+        let url = null;
+        let connected = false;
+        const tail = [];
 
-        const timer = setTimeout(() => {
+        const fail = (msg) => {
             if (settled) return;
             settled = true;
+            clearTimeout(timer);
             proc.kill();
-            reject(new Error('Hết thời gian chờ cloudflared tạo domain (30s)'));
+            const hint = tail.length ? ` — log cloudflared: ${tail.slice(-3).join(' | ')}` : '';
+            reject(new Error(msg + hint));
+        };
+
+        const timer = setTimeout(() => {
+            fail(url
+                ? 'cloudflared có domain nhưng không kết nối được tới Cloudflare (kiểm tra firewall: cho phép TCP/UDP cổng 7844 ra ngoài)'
+                : 'Hết thời gian chờ cloudflared tạo domain (45s)');
         }, START_TIMEOUT_MS);
 
         const onData = (chunk) => {
-            if (settled) return;
             buf += chunk.toString();
-            const url = parseTunnelUrl(buf);
-            if (url) {
+            const lines = buf.split('\n');
+            buf = lines.pop();
+            for (const line of lines) {
+                const clean = line.replace(/^\S+\s+/, '').trim();
+                if (clean) { tail.push(clean.slice(0, 160)); if (tail.length > 8) tail.shift(); }
+                url = url || parseTunnelUrl(line);
+                if (/Registered tunnel connection/i.test(line)) connected = true;
+            }
+            if (!settled && url && connected) {
                 settled = true;
                 clearTimeout(timer);
                 resolve(url);
@@ -86,21 +104,14 @@ function spawnTunnel(bin, port) {
         proc.stdout.on('data', onData);
         proc.stderr.on('data', onData);
 
-        proc.on('error', (err) => {
-            if (settled) return;
-            settled = true;
-            clearTimeout(timer);
-            reject(err);
-        });
+        proc.on('error', (err) => fail(err.message));
         proc.on('exit', (code) => {
             if (state.proc === proc) {
                 state.proc = null;
                 state.url = null;
             }
             if (!settled) {
-                settled = true;
-                clearTimeout(timer);
-                reject(new Error(`cloudflared thoát sớm (mã ${code})`));
+                fail(`cloudflared thoát sớm (mã ${code})`);
                 return;
             }
             if (state.wanted) scheduleRestart(port);
@@ -144,8 +155,11 @@ function start(port) {
         try {
             const bin = await ensureBinary();
             const url = await spawnTunnel(bin, port);
-            if (!(await waitUntilReachable(url))) {
-                throw new Error('Domain tunnel chưa truy cập được từ internet sau 60s, thử bật lại sau ít phút');
+            // cloudflared reports the connection as registered, so the tunnel is up. The
+            // self-check below only warms the edge route; it can fail on VMs whose own DNS
+            // can't resolve the new name, so it must not block registration.
+            if (!(await waitUntilReachable(url, { attempts: 8 }))) {
+                console.warn('⚠️ Tunnel: không tự gọi được domain từ máy chủ, vẫn tiếp tục đăng ký');
             }
             state.url = url;
             state.error = null;
