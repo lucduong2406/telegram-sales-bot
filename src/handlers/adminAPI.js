@@ -18,6 +18,30 @@ function setupAdminAPI(app, bot) {
 
     app.use('/api/admin', authMiddleware);
 
+    // ==================== Reports ====================
+
+    app.get('/api/admin/reports', (req, res) => {
+        try {
+            const reports = require('../utils/reports');
+            const rows = reports.getReportOrders(req.query);
+            res.json({ ...reports.buildReport(rows, req.query.group), rows });
+        } catch (err) {
+            res.status(500).json({ error: true, message: err.message });
+        }
+    });
+
+    app.get('/api/admin/reports/export', (req, res) => {
+        try {
+            const reports = require('../utils/reports');
+            const rows = reports.getReportOrders(req.query);
+            res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="bao-cao_${req.query.from || 'all'}_${req.query.to || 'all'}.csv"`);
+            res.send(reports.buildCsv(rows));
+        } catch (err) {
+            res.status(500).json({ error: true, message: err.message });
+        }
+    });
+
     // ==================== Dashboard ====================
 
     app.get('/api/admin/dashboard', (req, res) => {

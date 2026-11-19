@@ -641,6 +641,9 @@
         <a onclick="showSection('orders')">
           <span class="material-symbols-rounded">receipt_long</span> Đơn hàng
         </a>
+        <a onclick="showSection('reports')">
+          <span class="material-symbols-rounded">assessment</span> Báo cáo
+        </a>
         <a onclick="showSection('settings')">
           <span class="material-symbols-rounded">settings</span> Cài đặt
         </a>
@@ -790,6 +793,29 @@
           </div>
           <div id="ordersTable"></div>
         </div>
+      </div>
+
+      <div class="section" id="sec-reports">
+        <div class="page-header"><h1>Báo cáo &amp; Đối soát</h1><p>Doanh thu, dòng tiền theo thời gian — xuất CSV mở bằng Excel</p></div>
+        <div class="card" style="padding:16px;margin-bottom:16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+          <button class="btn btn-secondary" onclick="rpPreset('today')">Hôm nay</button>
+          <button class="btn btn-secondary" onclick="rpPreset('7d')">7 ngày</button>
+          <button class="btn btn-secondary" onclick="rpPreset('30d')">30 ngày</button>
+          <button class="btn btn-secondary" onclick="rpPreset('month')">Tháng này</button>
+          <input type="date" id="rpFrom"> → <input type="date" id="rpTo">
+          <select id="rpGroup"><option value="day">Theo ngày</option><option value="week">Theo tuần</option><option value="month">Theo tháng</option></select>
+          <select id="rpMethod"><option value="">Mọi phương thức</option><option value="vietqr">VND (VietQR/GPM)</option><option value="gpmpay">GPM Pay</option><option value="usdt">USDT</option><option value="paypal">PayPal</option></select>
+          <select id="rpStatus"><option value="">Mọi trạng thái</option><option value="delivered">delivered</option><option value="paid">paid</option><option value="delivering">delivering</option><option value="pending">pending</option><option value="expired">expired</option><option value="cancelled">cancelled</option></select>
+          <button class="btn btn-primary" onclick="loadReport()">Xem báo cáo</button>
+          <button class="btn btn-secondary" onclick="exportReport()"><span class="material-symbols-rounded" style="font-size:16px;vertical-align:middle">download</span> Xuất CSV</button>
+        </div>
+        <div class="stats-grid" id="rpStats"></div>
+        <div class="card" style="padding:16px;margin-bottom:16px"><h3 style="margin-bottom:12px">Doanh thu theo kỳ</h3><div id="rpChart"></div></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:16px">
+          <div class="card" style="padding:16px"><h3 style="margin-bottom:12px">Theo phương thức</h3><div id="rpMethod2"></div></div>
+          <div class="card" style="padding:16px"><h3 style="margin-bottom:12px">Theo sản phẩm</h3><div id="rpProduct"></div></div>
+        </div>
+        <div class="card" style="padding:16px"><h3 style="margin-bottom:12px">Chi tiết giao dịch (<span id="rpCount">0</span>)</h3><div id="rpTable" style="overflow-x:auto;max-height:480px;overflow-y:auto"></div></div>
       </div>
 
       <div class="section" id="sec-customers">
@@ -1244,6 +1270,67 @@ Số Lượng Đang Hiện Có 10"
       if (name === 'settings') { loadBankAccounts(); loadSupportContact(); }
       if (name === 'discounts') loadDiscounts();
       if (name === 'pricing') loadPricing();
+      if (name === 'reports') { if (!document.getElementById('rpFrom').value) rpPreset('30d'); else loadReport(); }
+    }
+
+    // ==================== Reports ====================
+    const rpFmt = n => (n || 0).toLocaleString('vi-VN') + 'đ';
+    const rpEsc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    function rpDate(d) { const z = new Date(d.getTime() + 7 * 3600e3); return z.toISOString().slice(0, 10); }
+    function rpPreset(p) {
+      const now = new Date(); let from = new Date(now);
+      if (p === '7d') from.setDate(from.getDate() - 6);
+      if (p === '30d') from.setDate(from.getDate() - 29);
+      if (p === 'month') from = new Date(now.getFullYear(), now.getMonth(), 1, 12);
+      document.getElementById('rpFrom').value = rpDate(from);
+      document.getElementById('rpTo').value = rpDate(now);
+      loadReport();
+    }
+    function rpQuery() {
+      const q = new URLSearchParams();
+      for (const [k, id] of [['from','rpFrom'],['to','rpTo'],['group','rpGroup'],['payment_method','rpMethod'],['status','rpStatus']]) {
+        const v = document.getElementById(id).value; if (v) q.set(k, v);
+      }
+      return q.toString();
+    }
+    function rpBars(items, labelFn) {
+      const max = Math.max(1, ...items.map(i => i.revenue));
+      return items.length ? items.map(i => `<div style="display:flex;align-items:center;gap:8px;margin:4px 0;font-size:12px">
+        <div style="width:90px;color:var(--text-muted);flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${rpEsc(labelFn(i))}">${rpEsc(labelFn(i))}</div>
+        <div style="flex:1;background:var(--bg-card);border-radius:4px;height:18px"><div style="width:${Math.max(2, i.revenue / max * 100)}%;height:100%;background:var(--accent, #6c5ce7);border-radius:4px"></div></div>
+        <div style="width:150px;text-align:right">${rpFmt(i.revenue)} <span style="color:var(--text-muted)">(${i.orders})</span></div></div>`).join('') : '<p style="color:var(--text-muted)">Không có dữ liệu</p>';
+    }
+    async function loadReport() {
+      try {
+        const d = await apiFetch('/reports?' + rpQuery());
+        const s = d.summary;
+        const card = (icon, color, label, val) => `<div class="stat-card"><div class="icon ${color}"><span class="material-symbols-rounded">${icon}</span></div><div class="label">${label}</div><div class="value">${val}</div></div>`;
+        document.getElementById('rpStats').innerHTML =
+          card('payments', 'green', 'Doanh thu', rpFmt(s.revenue)) +
+          card('trending_up', 'blue', 'Lợi nhuận (ước tính)', rpFmt(s.profit)) +
+          card('receipt_long', 'blue', 'Đơn đã thanh toán', `${s.paidOrders}/${s.orders}`) +
+          card('shopping_basket', 'blue', 'TB / đơn', rpFmt(s.avgOrder)) +
+          card('sell', 'blue', 'Giảm giá đã cấp', rpFmt(s.discount)) +
+          card('cancel', 'blue', 'Hết hạn / Huỷ', `${s.expiredOrders} / ${s.cancelledOrders}`);
+        document.getElementById('rpChart').innerHTML = rpBars(d.byPeriod, i => i.key);
+        const mname = { vietqr: 'VND (VietQR)', gpmpay: 'GPM Pay', usdt: 'USDT', paypal: 'PayPal', unknown: 'Khác' };
+        document.getElementById('rpMethod2').innerHTML = rpBars(d.byMethod, i => mname[i.key] || i.key);
+        document.getElementById('rpProduct').innerHTML = rpBars(d.byProduct, i => i.key);
+        document.getElementById('rpCount').textContent = d.rows.length;
+        let h = '<table><tr><th>Mã đơn</th><th>Thanh toán lúc</th><th>Sản phẩm</th><th>SL</th><th>Giảm</th><th>Tổng</th><th>PT</th><th>Trạng thái</th></tr>';
+        for (const r of d.rows.slice().reverse().slice(0, 500)) h += `<tr><td>${rpEsc(r.order_code)}</td><td>${rpEsc(r.paid_at || r.created_at)}</td><td>${rpEsc(r.product_name)}</td><td>${r.quantity}</td><td>${r.discount_amount ? rpFmt(r.discount_amount) : ''}</td><td>${rpFmt(r.total_amount)}</td><td>${rpEsc(r.payment_method)}</td><td>${rpEsc(r.status)}</td></tr>`;
+        document.getElementById('rpTable').innerHTML = h + '</table>' + (d.rows.length > 500 ? '<p style="color:var(--text-muted)">Hiển thị 500 dòng mới nhất — xuất CSV để xem đủ.</p>' : '');
+      } catch (e) { toast(e.message, 'error'); }
+    }
+    async function exportReport() {
+      try {
+        const res = await fetch(API + '/reports/export?' + rpQuery(), { headers: { 'x-api-key': API_KEY } });
+        if (!res.ok) throw new Error('Xuất thất bại');
+        const url = URL.createObjectURL(await res.blob());
+        const a = document.createElement('a');
+        a.href = url; a.download = `bao-cao_${document.getElementById('rpFrom').value}_${document.getElementById('rpTo').value}.csv`;
+        a.click(); URL.revokeObjectURL(url);
+      } catch (e) { toast(e.message, 'error'); }
     }
 
     // ==================== Dashboard ====================
