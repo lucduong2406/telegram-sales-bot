@@ -86,10 +86,13 @@ function setupMenuHandler(bot) {
     bot.onText(/\/paymentmethod/, (msg) => {
         const userId = msg.from.id;
         const lang = getLang(userId, db.getUserLanguage);
-        const methods = db.getEnabledPaymentMethods();
-        const current = db.getPreferredPaymentMethod(userId);
+        let methods = db.getEnabledPaymentMethods();
+        // VietQR and GPM Pay are both VND bank transfer — show a single entry
+        if (methods.some(m => m.id === 'gpmpay')) methods = methods.filter(m => m.id !== 'vietqr');
+        let current = db.getPreferredPaymentMethod(userId);
+        if (current === 'vietqr' && methods.some(m => m.id === 'gpmpay')) current = 'gpmpay';
 
-        const methodNames = { vietqr: 'VietQR (VND)', usdt: 'USDT (Crypto)', paypal: 'PayPal (USD)' };
+        const methodNames = { vietqr: 'VND', gpmpay: 'VND', usdt: 'USDT (Crypto)', paypal: 'PayPal (USD)' };
         const currentLabel = current ? methodNames[current] : (lang === 'en' ? 'Not set' : 'Chưa chọn');
         const text = lang === 'en'
             ? `💳 *Default payment method:* ${currentLabel}\n\nSelect a new default:`
