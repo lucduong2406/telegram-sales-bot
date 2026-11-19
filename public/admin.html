@@ -634,7 +634,7 @@ Số Lượng Đang Hiện Có 10"
               <div style="display:flex;gap:8px"><input type="text" id="tunnelUrl" readonly><button class="btn btn-sm" onclick="copyTunnel('tunnelUrl')"><i class="ph ph-copy"></i></button></div>
             </div>
             <div class="form-group">
-              <label>URL webhook đã đăng ký với GPM Pay</label>
+              <label>URL webhook — dán vào GPM Pay nếu khai báo thủ công <span id="tunnelRegState" style="font-weight:400;color:var(--text-muted)"></span></label>
               <div style="display:flex;gap:8px"><input type="text" id="tunnelWebhook" readonly><button class="btn btn-sm" onclick="copyTunnel('tunnelWebhook')"><i class="ph ph-copy"></i></button></div>
             </div>
             <button class="btn btn-sm btn-primary" onclick="reregisterTunnel()"><i class="ph ph-arrows-clockwise"></i> Đăng ký lại với GPM Pay</button>
@@ -2655,7 +2655,8 @@ Số Lượng Đang Hiện Có 10"
       badge.textContent = txt;
       document.getElementById('tunnelInfo').style.display = s.running ? 'block' : 'none';
       document.getElementById('tunnelUrl').value = s.url || '';
-      document.getElementById('tunnelWebhook').value = s.webhookUrl || '(chưa đăng ký)';
+      document.getElementById('tunnelWebhook').value = s.url ? s.url + '/webhook/gpmpay' : '';
+      document.getElementById('tunnelRegState').textContent = s.webhookUrl ? '(đã tự đăng ký với GPM Pay)' : '(chưa tự đăng ký)';
       const err = document.getElementById('tunnelError');
       err.textContent = s.error ? '⚠️ ' + s.error : '';
       err.style.display = s.error ? 'block' : 'none';
