@@ -341,6 +341,7 @@ function sendMainMenu(bot, chatId, editMessageId = null, userId = null) {
             { text: '💱 ' + (lang === 'en' ? 'Currency' : 'Tiền tệ'), callback_data: CALLBACKS.MENU_CURRENCY },
             { text: t('btn_support', lang), url: getSupportContact().url },
         ],
+        [{ text: lang === 'en' ? '🛡 Request warranty' : '🛡 Yêu cầu bảo hành', callback_data: CALLBACKS.WARRANTY_MENU }],
     ];
 
     if (editMessageId) {

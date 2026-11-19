@@ -14,6 +14,26 @@ function setupWarrantyHandler(bot) {
         const chatId = query.message && query.message.chat.id;
         const msgId = query.message && query.message.message_id;
 
+        // Customer: list orders eligible for warranty
+        if (data === CALLBACKS.WARRANTY_MENU) {
+            const lang = getLang(query.from.id, db.getUserLanguage);
+            answer();
+            const rows = [];
+            for (const o of db.getUserOrders(query.from.id, 50)) {
+                if (o.status !== 'delivered') continue;
+                const st = getWarrantyStatus(o, db.getProductById(o.product_id));
+                if (!st.active) continue;
+                rows.push([{ text: `🛡 #${o.order_code} | ${o.product_name} | ${st.daysLeft}d`,
+                    callback_data: `${CALLBACKS.WARRANTY_NEW_PREFIX}${o.order_code}` }]);
+            }
+            rows.push([{ text: L(lang, '🏠 Menu chính', '🏠 Main menu'), callback_data: CALLBACKS.MENU_MAIN }]);
+            const text = rows.length > 1
+                ? L(lang, '🛡 *Chọn đơn cần bảo hành:*', '🛡 *Choose an order for warranty:*')
+                : L(lang, '🛡 Bạn chưa có đơn nào còn thời hạn bảo hành.', '🛡 You have no orders under warranty.');
+            bot.editMessageText(text, { chat_id: chatId, message_id: msgId, parse_mode: 'Markdown', reply_markup: { inline_keyboard: rows } }).catch(() => {});
+            return;
+        }
+
         // Customer: open reason picker
         if (data.startsWith(CALLBACKS.WARRANTY_NEW_PREFIX)) {
             const code = data.slice(CALLBACKS.WARRANTY_NEW_PREFIX.length);
