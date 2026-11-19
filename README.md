@@ -1,6 +1,6 @@
 # Telegram Auto-Sales Bot
 
-**v2.4.0**
+**v2.5.0**
 
 > 🚀 **Tìm kiếm phiên bản SaaS Multi-Tenant & Quản lý CTV?**
 > Hãy tham khảo **[BotShopez](https://botshopez.com)** — Nền tảng SaaS Telegram Bot hoàn chỉnh với kiến trúc Monorepo (Next.js 15, NestJS 11, PostgreSQL, Redis BullMQ, Grammy). Hỗ trợ nhiều shop tập trung, phân quyền RBAC (Owner / Admin / CTV), chia sẻ kho hàng (shared stock), tự động đối soát hoa hồng & công nợ CTV!
@@ -218,6 +218,17 @@ journalctl -u telegram-bot -f
 ---
 
 ## 📝 Changelog
+
+### v2.5.0
+- **Báo cáo & đối soát** trong admin: doanh thu/lợi nhuận theo ngày-tuần-tháng, theo phương thức và sản phẩm, xuất CSV mở bằng Excel.
+- **Bảo hành**: khách yêu cầu ngay trong bot (menu chính và chi tiết đơn), admin nhận tin và xử lý/từ chối bằng nút.
+- Xử lý thanh toán **trễ hạn / chuyển dư / chuyển thiếu / trùng**, nút **🔄 Giao lại** cho đơn kẹt, **sao lưu database** định kỳ (chỉ lưu trên máy chủ, không gửi cho khách).
+- Gộp VietQR/GPM Pay thành một mục **VND** ở `/paymentmethod`.
+- Admin bật/tắt bước hỏi **mã giảm giá**; khách cũng có thể tự bật/tắt.
+- Nút **liên hệ hỗ trợ** sau thông báo hết hàng; liên hệ hỗ trợ cấu hình được trong admin.
+- Tuỳ chỉnh **lời chào** (tiêu đề + nội dung) trong admin.
+- Icon riêng cho từng sản phẩm và hỗ trợ **custom emoji** (logo thương hiệu, cần Telegram Premium; tự lùi về emoji thường nếu bị từ chối).
+- Sửa nút bật/tắt và xoá danh mục trong admin.
 
 ### v2.4.0
 - Thêm thanh toán **GPM Pay** (SDK chính thức, webhook HMAC, idempotency, kiểm tra số tiền).
