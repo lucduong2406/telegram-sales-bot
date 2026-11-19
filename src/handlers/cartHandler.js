@@ -1,4 +1,5 @@
 const db = require('../database');
+const { sendInsufficientStock } = require('../utils/support');
 const { formatPrice } = require('./menuHandler');
 const { CALLBACKS } = require('./callbacks');
 const { t, getLang } = require('../locales');
@@ -205,13 +206,11 @@ function startCheckout(bot, chatId, messageId, userId) {
     // Check stock for all items
     for (const item of cart) {
         if (item.product_type === 'credential' && item.stock < item.quantity) {
-            bot.sendMessage(chatId,
-                t('order_insufficient_stock', lang, {
-                    name: item.name,
-                    requested: item.quantity,
-                    available: item.stock,
-                })
-            );
+            sendInsufficientStock(bot, chatId, lang, {
+                name: item.name,
+                requested: item.quantity,
+                available: item.stock,
+            });
             return;
         }
     }

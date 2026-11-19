@@ -1,4 +1,5 @@
 const db = require('../database');
+const { sendInsufficientStock } = require('../utils/support');
 const config = require('../config');
 const { generateQRUrl } = require('../utils/vietqr');
 const { buildGpmPayQrUrl, buildGpmPayQrPng } = require('../utils/gpmpay');
@@ -195,11 +196,11 @@ async function createOrder(bot, data) {
         }
 
         if (product.stock < quantity) {
-            bot.sendMessage(chatId, t('order_insufficient_stock', lang, {
+            sendInsufficientStock(bot, chatId, lang, {
                 name: product.name,
                 requested: quantity,
                 available: product.stock,
-            }));
+            });
             return;
         }
 
@@ -553,11 +554,11 @@ async function createOrderGpmPay(bot, data) {
         }
 
         if (product.stock < quantity) {
-            bot.sendMessage(chatId, t('order_insufficient_stock', lang, {
+            sendInsufficientStock(bot, chatId, lang, {
                 name: product.name,
                 requested: quantity,
                 available: product.stock,
-            }));
+            });
             return;
         }
 

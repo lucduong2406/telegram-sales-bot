@@ -126,6 +126,7 @@ module.exports = {
   btn_cancel_order: '❌ Cancel Order',
   order_not_found: '❌ Order not found.',
   order_product_not_found: '❌ Product not found.',
+  insufficient_stock_contact: '💬 Need a larger quantity? Contact the admin for help:',
   order_insufficient_stock: '❌ Insufficient stock!\nProduct: {name}\nRequested: {requested}\nAvailable: {available}',
   order_create_error: '❌ Error creating order. Please try again.',
   order_out_of_stock: '❌ Product is out of stock!',

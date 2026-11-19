@@ -1,4 +1,5 @@
 const db = require('../database');
+const { sendInsufficientStock } = require('../utils/support');
 const { formatPrice } = require('./menuHandler');
 const { CALLBACKS } = require('./callbacks');
 const { t, getLang } = require('../locales');
@@ -79,6 +80,17 @@ function setupQuantityHandler(bot) {
         if (isNaN(quantity) || quantity <= 0) {
             const lang = getLang(userId, db.getUserLanguage);
             bot.sendMessage(msg.chat.id, t('invalid_quantity', lang, { max: 999 }));
+            return;
+        }
+
+        const product = db.getProductById(productId);
+        if (product && product.stock < quantity) {
+            const lang = getLang(userId, db.getUserLanguage);
+            sendInsufficientStock(bot, msg.chat.id, lang, {
+                name: product.name,
+                requested: quantity,
+                available: product.stock,
+            });
             return;
         }
 

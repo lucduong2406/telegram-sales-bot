@@ -126,6 +126,7 @@ module.exports = {
   btn_cancel_order: '❌ Hủy đơn',
   order_not_found: '❌ Không tìm thấy đơn hàng.',
   order_product_not_found: '❌ Sản phẩm không tồn tại.',
+  insufficient_stock_contact: '💬 Cần số lượng lớn hơn? Liên hệ admin để được hỗ trợ:',
   order_insufficient_stock: '❌ Không đủ hàng!\nSản phẩm: {name}\nYêu cầu: {requested}\nTồn kho: {available}',
   order_create_error: '❌ Có lỗi xảy ra khi tạo đơn hàng. Vui lòng thử lại.',
   order_out_of_stock: '❌ Sản phẩm đã hết hàng!',
