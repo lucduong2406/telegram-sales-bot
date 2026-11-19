@@ -1,6 +1,6 @@
 # Telegram Auto-Sales Bot
 
-**v2.5.0**
+**v2.6.0**
 
 > 🚀 **Tìm kiếm phiên bản SaaS Multi-Tenant & Quản lý CTV?**
 > Hãy tham khảo **[BotShopez](https://botshopez.com)** — Nền tảng SaaS Telegram Bot hoàn chỉnh với kiến trúc Monorepo (Next.js 15, NestJS 11, PostgreSQL, Redis BullMQ, Grammy). Hỗ trợ nhiều shop tập trung, phân quyền RBAC (Owner / Admin / CTV), chia sẻ kho hàng (shared stock), tự động đối soát hoa hồng & công nợ CTV!
@@ -218,6 +218,10 @@ journalctl -u telegram-bot -f
 ---
 
 ## 📝 Changelog
+
+### v2.6.0
+- **Thiết kế lại giao diện admin**: chế độ sáng/tối, icon Phosphor, bố cục gọn, thanh lọc Báo cáo nằm ngang, tối ưu mobile.
+- Sửa lỗi mục **Khách hàng** báo `{} is not iterable`.
 
 ### v2.5.0
 - **Báo cáo & đối soát** trong admin: doanh thu/lợi nhuận theo ngày-tuần-tháng, theo phương thức và sản phẩm, xuất CSV mở bằng Excel.
