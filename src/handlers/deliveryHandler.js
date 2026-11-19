@@ -185,15 +185,26 @@ async function deliverCredential(bot, order, product) {
         text += `\n⚠️ Lưu ý: Vui lòng đổi mật khẩu sau khi nhận tài khoản.\n`;
         text += `Cảm ơn bạn đã mua hàng! 🙏`;
 
-        await bot.sendMessage(order.telegram_user_id, text, {
-            parse_mode: 'Markdown',
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: '🛍 Mua thêm', callback_data: CALLBACKS.MENU_PRODUCTS }],
-                    [{ text: '🏠 Menu chính', callback_data: CALLBACKS.MENU_MAIN }],
-                ],
-            },
-        });
+        const deliveryKeyboard = {
+            inline_keyboard: [
+                [{ text: '🛍 Mua thêm', callback_data: CALLBACKS.MENU_PRODUCTS }],
+                [{ text: '🏠 Menu chính', callback_data: CALLBACKS.MENU_MAIN }],
+            ],
+        };
+
+        if (text.length <= 4000) {
+            await bot.sendMessage(order.telegram_user_id, text, {
+                parse_mode: 'Markdown',
+                reply_markup: deliveryKeyboard,
+            });
+        } else {
+            // Telegram limits messages to 4096 chars — send full content as a text file
+            const plain = text.replace(/[*`]/g, '');
+            await bot.sendDocument(order.telegram_user_id, Buffer.from(plain, 'utf8'), {
+                caption: `✅ Đơn hàng #${order.order_code} - HOÀN TẤT\n📎 Thông tin tài khoản nằm trong file đính kèm.`,
+                reply_markup: deliveryKeyboard,
+            }, { filename: `${order.order_code}.txt`, contentType: 'text/plain' });
+        }
 
         // Mark as sold and delivered AFTER successful message send
         db.markCredentialsSold(credIds, order.id);
