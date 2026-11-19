@@ -224,6 +224,18 @@ async function initDatabase() {
     )
   `);
 
+    db.run(`
+    CREATE TABLE IF NOT EXISTS warranty_claims (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_code TEXT NOT NULL,
+      telegram_user_id INTEGER NOT NULL,
+      reason TEXT,
+      status TEXT DEFAULT 'open',
+      created_at TEXT DEFAULT (datetime('now')),
+      resolved_at TEXT
+    )
+  `);
+
     // Product prices (multi-currency manual pricing)
     db.run(`
     CREATE TABLE IF NOT EXISTS product_prices (
@@ -746,6 +758,34 @@ function updateOrderStatus(orderCode, status) {
 /**
  * Check if a GPM Pay transaction has already been processed (idempotency)
  */
+function createWarrantyClaim(orderCode, userId, reason) {
+    db.run('INSERT INTO warranty_claims (order_code, telegram_user_id, reason) VALUES (?, ?, ?)', [orderCode, userId, reason]);
+    const id = db.exec('SELECT last_insert_rowid()')[0].values[0][0];
+    saveDatabase();
+    return id;
+}
+
+function getWarrantyClaim(id) {
+    const stmt = db.prepare('SELECT * FROM warranty_claims WHERE id = ?');
+    stmt.bind([id]);
+    const row = stmt.step() ? stmt.getAsObject() : null;
+    stmt.free();
+    return row;
+}
+
+function getOpenWarrantyClaim(orderCode) {
+    const stmt = db.prepare("SELECT * FROM warranty_claims WHERE order_code = ? AND status = 'open' LIMIT 1");
+    stmt.bind([orderCode]);
+    const row = stmt.step() ? stmt.getAsObject() : null;
+    stmt.free();
+    return row;
+}
+
+function resolveWarrantyClaim(id, status) {
+    db.run("UPDATE warranty_claims SET status = ?, resolved_at = datetime('now') WHERE id = ? AND status = 'open'", [status, id]);
+    saveDatabase();
+}
+
 function isTransactionProcessed(transactionId) {
     const result = db.exec('SELECT 1 FROM processed_transactions WHERE id = ?', [transactionId]);
     return result.length > 0 && result[0].values.length > 0;
@@ -1425,6 +1465,10 @@ module.exports = {
     saveDatabase,
     DB_PATH,
     isDiscountPromptEnabled,
+    createWarrantyClaim,
+    getWarrantyClaim,
+    getOpenWarrantyClaim,
+    resolveWarrantyClaim,
     setDiscountPromptEnabled,
     getDb,
     // Categories

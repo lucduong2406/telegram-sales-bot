@@ -17,6 +17,7 @@ const { setupAdminAPI } = require('./handlers/adminAPI');
 const { setupProfileHandler } = require('./handlers/profileHandler');
 const { setupHelpHandler, setupGuideCallback } = require('./handlers/helpHandler');
 const { setupInviteConfirmHandler, setupRedeliverHandler } = require('./handlers/deliveryHandler');
+const { setupWarrantyHandler } = require('./handlers/warrantyHandler');
 const { setupDiscountHandler } = require('./handlers/discountHandler');
 const { setupCartHandler } = require('./handlers/cartHandler');
 const { setupCurrencyHandler } = require('./handlers/currencyHandler');
@@ -154,6 +155,7 @@ async function main() {
     setupOrderHandler(bot);
     setupInviteConfirmHandler(bot);
     setupRedeliverHandler(bot);
+    setupWarrantyHandler(bot);
     setupDiscountHandler(bot);
     setupCartHandler(bot);
     setupCurrencyHandler(bot);

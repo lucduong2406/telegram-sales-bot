@@ -22,6 +22,10 @@ const CALLBACKS = {
     // Delivery / Admin actions
     INVITE_DONE_PREFIX: 'invite_done_',
     REDELIVER_PREFIX: 'redeliver_',
+    WARRANTY_NEW_PREFIX: 'wc_new_',
+    WARRANTY_REASON_PREFIX: 'wc_r_',
+    WARRANTY_OK_PREFIX: 'wc_ok_',
+    WARRANTY_NO_PREFIX: 'wc_no_',
     PREORDER_DONE_PREFIX: 'preorder_done_',
 
     // Help

@@ -5,6 +5,7 @@ const { generateQRUrl } = require('../utils/vietqr');
 const { buildGpmPayQrUrl, buildGpmPayQrPng } = require('../utils/gpmpay');
 const { formatPrice } = require('./menuHandler');
 const { CALLBACKS } = require('./callbacks');
+const { getWarrantyStatus } = require('../utils/warranty');
 const { t, getLang } = require('../locales');
 const { handlePaymentCurrencySwitch, formatCurrencyPrice } = require('./currencyHandler');
 
@@ -1004,6 +1005,12 @@ function showOrderDetail(bot, chatId, messageId, orderCode, userId = null) {
     const keyboard = [];
     if (order.status === 'pending') {
         keyboard.push([{ text: t('btn_cancel_order', lang), callback_data: `${CALLBACKS.CANCEL_ORDER_PREFIX}${order.order_code}` }]);
+    }
+    if (order.status === 'delivered' && getWarrantyStatus(order, product).active) {
+        const open = db.getOpenWarrantyClaim(order.order_code);
+        keyboard.push([open
+            ? { text: lang === 'en' ? '⏳ Warranty claim in progress' : '⏳ Đang xử lý bảo hành', callback_data: CALLBACKS.NOOP }
+            : { text: lang === 'en' ? '🛡 Request warranty' : '🛡 Yêu cầu bảo hành', callback_data: `${CALLBACKS.WARRANTY_NEW_PREFIX}${order.order_code}` }]);
     }
     keyboard.push([{ text: t('btn_orders', lang), callback_data: CALLBACKS.MENU_ORDERS }]);
     keyboard.push([{ text: t('btn_main_menu', lang), callback_data: CALLBACKS.MENU_MAIN }]);
