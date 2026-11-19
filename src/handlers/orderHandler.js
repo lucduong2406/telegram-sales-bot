@@ -630,13 +630,13 @@ async function createOrderGpmPay(bot, data) {
             text += t('order_sla', lang, { hours: product.delivery_hours }) + '\n';
         }
         text += '\n' + t('order_expires', lang, { minutes: minutesLeft }) + '\n\n';
-        text += t('gpmpay_title') + '\n';
-        text += t('gpmpay_bank', { bank: bank.name }) + '\n';
-        text += t('gpmpay_account', { account: bank.accountNo }) + '\n';
-        text += t('gpmpay_owner', { name: bank.accountName }) + '\n';
-        text += t('gpmpay_content', { code: orderCode }) + '\n';
-        text += t('gpmpay_note') + '\n\n';
-        text += t('gpmpay_qr');
+        text += t('gpmpay_title', lang) + '\n';
+        text += t('gpmpay_bank', lang, { bank: bank.name }) + '\n';
+        text += t('gpmpay_account', lang, { account: bank.accountNo }) + '\n';
+        text += t('gpmpay_owner', lang, { name: bank.accountName }) + '\n';
+        text += t('gpmpay_content', lang, { code: orderCode }) + '\n';
+        text += t('gpmpay_note', lang) + '\n\n';
+        text += t('gpmpay_qr', lang);
 
         const keyboard = [
             [{ text: t('btn_cancel_order', lang), callback_data: `${CALLBACKS.CANCEL_ORDER_PREFIX}${orderCode}` }],
@@ -718,13 +718,13 @@ async function createGpmPayMultiItemOrder(bot, data) {
             text += t('order_email', lang, { email: customerEmail }) + '\n';
         }
         text += '\n' + t('order_expires', lang, { minutes: minutesLeft }) + '\n\n';
-        text += t('gpmpay_title') + '\n';
-        text += t('gpmpay_bank', { bank: bank.name }) + '\n';
-        text += t('gpmpay_account', { account: bank.accountNo }) + '\n';
-        text += t('gpmpay_owner', { name: bank.accountName }) + '\n';
-        text += t('gpmpay_content', { code: orderCode }) + '\n';
-        text += t('gpmpay_note') + '\n\n';
-        text += t('gpmpay_qr');
+        text += t('gpmpay_title', lang) + '\n';
+        text += t('gpmpay_bank', lang, { bank: bank.name }) + '\n';
+        text += t('gpmpay_account', lang, { account: bank.accountNo }) + '\n';
+        text += t('gpmpay_owner', lang, { name: bank.accountName }) + '\n';
+        text += t('gpmpay_content', lang, { code: orderCode }) + '\n';
+        text += t('gpmpay_note', lang) + '\n\n';
+        text += t('gpmpay_qr', lang);
 
         const keyboard = [
             [{ text: t('btn_cancel_order', lang), callback_data: `${CALLBACKS.CANCEL_ORDER_PREFIX}${orderCode}` }],
