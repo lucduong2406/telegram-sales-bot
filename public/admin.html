@@ -618,6 +618,32 @@ Số Lượng Đang Hiện Có 10"
 
         <div class="card" style="margin-top:20px">
           <div class="card-header">
+            <h3><i class="ph ph-cloud"></i> Tunnel Cloudflare (không cần domain)</h3>
+            <span id="tunnelBadge" class="badge badge-warning">Tắt</span>
+          </div>
+          <div class="form-group">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+              <input type="checkbox" id="tunnelEnabled" onchange="toggleTunnel()">
+              Tự tạo domain <code>*.trycloudflare.com</code> và đăng ký webhook với GPM Pay
+            </label>
+            <p class="hint">Dùng khi máy chủ chưa có domain. Bot tự tải/chạy <code>cloudflared</code>, lấy domain và đăng ký (cập nhật) webhook GPM Pay. Domain đổi mỗi lần tunnel khởi động lại — bot sẽ tự đăng ký lại. Chạy lâu dài nên dùng domain riêng. Cần GPMPAY_API_TOKEN có quyền <code>webhooks:manage</code>.</p>
+          </div>
+          <div id="tunnelInfo" style="display:none">
+            <div class="form-group">
+              <label>Domain tunnel</label>
+              <div style="display:flex;gap:8px"><input type="text" id="tunnelUrl" readonly><button class="btn btn-sm" onclick="copyTunnel('tunnelUrl')"><i class="ph ph-copy"></i></button></div>
+            </div>
+            <div class="form-group">
+              <label>URL webhook đã đăng ký với GPM Pay</label>
+              <div style="display:flex;gap:8px"><input type="text" id="tunnelWebhook" readonly><button class="btn btn-sm" onclick="copyTunnel('tunnelWebhook')"><i class="ph ph-copy"></i></button></div>
+            </div>
+            <button class="btn btn-sm btn-primary" onclick="reregisterTunnel()"><i class="ph ph-arrows-clockwise"></i> Đăng ký lại với GPM Pay</button>
+          </div>
+          <p id="tunnelError" class="hint" style="color:var(--danger);display:none"></p>
+        </div>
+
+        <div class="card" style="margin-top:20px">
+          <div class="card-header">
             <h3><i class="ph ph-hand-waving"></i> Lời chào khách hàng</h3>
             <button class="btn btn-sm btn-primary" onclick="saveWelcome()"><i class="ph ph-floppy-disk"></i> Lưu</button>
           </div>
@@ -2603,6 +2629,7 @@ Số Lượng Đang Hiện Có 10"
         document.getElementById('welcomeMessage').value = s.welcome_message || '';
         document.getElementById('discountPromptEnabled').checked = s.discount_prompt_enabled !== '0';
       } catch (err) { /* ignore */ }
+      loadTunnel();
     }
 
     async function saveDiscountPrompt() {
@@ -2611,6 +2638,62 @@ Số Lượng Đang Hiện Có 10"
         await apiFetch('/settings', { method: 'PUT', body: { discount_prompt_enabled: box.checked ? '1' : '0' } });
         toast(box.checked ? '✅ Đã bật hỏi mã giảm giá' : '✅ Đã tắt hỏi mã giảm giá');
       } catch (e) { box.checked = !box.checked; toast(e.message, 'error'); }
+    }
+
+    // ==================== Cloudflare Tunnel ====================
+    let tunnelTimer = null;
+
+    function renderTunnel(s) {
+      const box = document.getElementById('tunnelEnabled');
+      box.checked = !!s.enabled;
+      const badge = document.getElementById('tunnelBadge');
+      let cls = 'badge-warning', txt = 'Tắt';
+      if (s.enabled && s.running) { cls = 'badge-success'; txt = 'Đang chạy'; }
+      else if (s.enabled && s.error && !s.starting) { cls = 'badge-danger'; txt = 'Lỗi'; }
+      else if (s.enabled) { cls = 'badge-info'; txt = 'Đang kết nối...'; }
+      badge.className = 'badge ' + cls;
+      badge.textContent = txt;
+      document.getElementById('tunnelInfo').style.display = s.running ? 'block' : 'none';
+      document.getElementById('tunnelUrl').value = s.url || '';
+      document.getElementById('tunnelWebhook').value = s.webhookUrl || '(chưa đăng ký)';
+      const err = document.getElementById('tunnelError');
+      err.textContent = s.error ? '⚠️ ' + s.error : '';
+      err.style.display = s.error ? 'block' : 'none';
+      // Poll while connecting so the URL shows up without a manual refresh
+      clearTimeout(tunnelTimer);
+      if (s.enabled && (s.starting || !s.running || (s.running && !s.webhookUrl && !s.error))) {
+        tunnelTimer = setTimeout(loadTunnel, 3000);
+      }
+    }
+
+    async function loadTunnel() {
+      try { renderTunnel(await apiFetch('/tunnel')); } catch (e) { /* ignore */ }
+    }
+
+    async function toggleTunnel() {
+      const box = document.getElementById('tunnelEnabled');
+      const want = box.checked;
+      box.disabled = true;
+      toast(want ? '⏳ Đang tạo tunnel, có thể mất tới 30 giây...' : 'Đang tắt tunnel...');
+      try {
+        renderTunnel(await apiFetch('/tunnel', { method: 'POST', body: { enabled: want } }));
+        toast(want ? '✅ Đã bật tunnel' : '✅ Đã tắt tunnel');
+      } catch (e) {
+        toast(e.message, 'error');
+        await loadTunnel();
+      } finally { box.disabled = false; }
+    }
+
+    async function reregisterTunnel() {
+      try {
+        renderTunnel(await apiFetch('/tunnel/reregister', { method: 'POST' }));
+        toast('✅ Đã đăng ký lại webhook với GPM Pay');
+      } catch (e) { toast(e.message, 'error'); }
+    }
+
+    function copyTunnel(id) {
+      const v = document.getElementById(id).value;
+      if (v) navigator.clipboard.writeText(v).then(() => toast('Đã sao chép'));
     }
 
     async function saveWelcome() {

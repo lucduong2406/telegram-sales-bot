@@ -1,5 +1,6 @@
 const db = require('../database');
 const config = require('../config');
+const tunnelService = require('../utils/tunnelService');
 const { deliverCredentials } = require('./deliveryHandler');
 
 /** Telegram custom emoji IDs are numeric strings */
@@ -1047,6 +1048,34 @@ function setupAdminAPI(app, bot) {
             res.json(db.getCustomerOrders(parseInt(req.params.id)));
         } catch (err) {
             res.status(500).json({ error: true, message: err.message, code: 'INTERNAL_ERROR' });
+        }
+    });
+
+    // ==================== Cloudflare Tunnel (GPM Pay webhook) ====================
+
+    app.get('/api/admin/tunnel', (req, res) => {
+        res.json(tunnelService.getStatus());
+    });
+
+    app.post('/api/admin/tunnel', async (req, res) => {
+        if (typeof req.body.enabled !== 'boolean') {
+            return res.status(400).json({ error: true, message: 'enabled phải là true/false', code: 'VALIDATION_ERROR' });
+        }
+        try {
+            await tunnelService.setEnabled(req.body.enabled);
+            res.json(tunnelService.getStatus());
+        } catch (err) {
+            // Setting is saved; report the failure with current status
+            res.status(500).json({ error: true, message: err.message, code: 'TUNNEL_ERROR', status: tunnelService.getStatus() });
+        }
+    });
+
+    app.post('/api/admin/tunnel/reregister', async (req, res) => {
+        try {
+            await tunnelService.reregister();
+            res.json(tunnelService.getStatus());
+        } catch (err) {
+            res.status(500).json({ error: true, message: err.message, code: 'TUNNEL_ERROR' });
         }
     });
 

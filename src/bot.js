@@ -27,6 +27,7 @@ const { startBackupScheduler } = require('./utils/backup');
 const { setupScheduler } = require('./scheduler');
 const { setupCheckerAPI } = require('./handlers/checkerAPI');
 const { setupGpmPayWebhookHandler } = require('./handlers/gpmpayWebhookHandler');
+const { startIfEnabled: startTunnelIfEnabled } = require('./utils/tunnelService');
 
 async function main() {
     console.log('🚀 Starting Telegram Sales Bot v2.0...');
@@ -137,6 +138,9 @@ async function main() {
     // Start Express server
     app.listen(config.port, async () => {
         console.log(`🌐 Express server running on port ${config.port}`);
+
+        // Cloudflare quick tunnel (admin-toggled) — server must be listening first
+        startTunnelIfEnabled();
 
         if (isProduction) {
             console.log('⏳ Waiting 5s before setting webhook...');

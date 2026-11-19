@@ -2,6 +2,7 @@ const express = require('express');
 const config = require('../config');
 const { constructWebhookEvent } = require('@gpmpay/sdk/webhooks');
 const { processIncomingPayment } = require('../utils/paymentProcessor');
+const { getWebhookSecret } = require('../utils/gpmpayWebhookRegister');
 
 /**
  * Setup Express route for GPM Pay webhook.
@@ -11,7 +12,8 @@ const { processIncomingPayment } = require('../utils/paymentProcessor');
 function setupGpmPayWebhookHandler(app, bot) {
     app.post('/webhook/gpmpay', express.raw({ type: 'application/json' }), async (req, res) => {
         try {
-            if (!config.gpmpayWebhookSecret) {
+            const webhookSecret = getWebhookSecret();
+            if (!webhookSecret) {
                 console.error('❌ GPM Pay: GPMPAY_WEBHOOK_SECRET not set');
                 res.status(500).json({ error: 'Webhook secret not configured' });
                 return;
@@ -29,7 +31,7 @@ function setupGpmPayWebhookHandler(app, bot) {
                 event = constructWebhookEvent({
                     rawBody: req.body,
                     signature,
-                    secret: config.gpmpayWebhookSecret,
+                    secret: webhookSecret,
                 });
             } catch (sigErr) {
                 console.warn('⚠️ GPM Pay: Invalid webhook signature:', sigErr.message);

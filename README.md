@@ -184,6 +184,8 @@ apt install -y ./cloudflared.deb
 
 Trong Cloudflare Zero Trust → Tunnels, tạo tunnel và thêm Public Hostname trỏ domain của bạn tới `http://127.0.0.1:3000`.
 
+**Chưa có domain?** Vào admin → **Cài đặt → Tunnel Cloudflare** và bật công tắc: bot tự tải `cloudflared` (Linux), tạo domain `*.trycloudflare.com` và đăng ký webhook với GPM Pay (cần `GPMPAY_API_TOKEN` có quyền `webhooks:manage`). Domain này đổi mỗi lần tunnel khởi động lại, bot tự đăng ký lại; dùng lâu dài nên dùng domain riêng như hướng dẫn trên.
+
 Tạo service systemd `/etc/systemd/system/telegram-bot.service`:
 
 ```ini
@@ -218,6 +220,9 @@ journalctl -u telegram-bot -f
 ---
 
 ## 📝 Changelog
+
+### Chưa phát hành
+- Cài đặt admin: công tắc **Tunnel Cloudflare (không cần domain)** tự tạo domain và đăng ký webhook GPM Pay.
 
 ### v2.6.0
 - **Thiết kế lại giao diện admin**: chế độ sáng/tối, icon Phosphor, bố cục gọn, thanh lọc Báo cáo nằm ngang, tối ưu mobile.
